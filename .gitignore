@@ -73,3 +73,7 @@ desktop.ini
 # Misc
 .tmp/
 temp/
+
+# Generated screenshot artifacts (regenerate via capture-before.mjs / capture-after.mjs)
+/before/
+/after/

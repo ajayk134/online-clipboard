@@ -65,7 +65,7 @@ function openClipEditor({ clip = null, onSaved } = {}) {
       </div>
     </div>
 
-    <input id="ed-title" class="input title-input" placeholder="Title (optional)" maxlength="200"
+    <input id="ed-title" class="input title-input" placeholder="Title (optional)" aria-label="Clip title" maxlength="200"
            value="${clip ? escapeHtml(clip.title || '') : ''}">
 
     <div class="editor-panes">
@@ -73,7 +73,7 @@ function openClipEditor({ clip = null, onSaved } = {}) {
       <div class="ed-pane" data-pane="richtext"><div id="ed-quill"></div></div>
       <div class="ed-pane" data-pane="code">
         <div class="code-head">
-          <select id="ed-lang" class="input select small">
+          <select id="ed-lang" class="input select small" aria-label="Code language">
             <option value="">Language…</option>
             ${['javascript','typescript','python','java','c','cpp','csharp','go','rust','php','ruby','sql','json','yaml','xml','html','css','bash','shell','dockerfile','markdown','plaintext'].map(l => `<option value="${l}">${l}</option>`).join('')}
           </select>
@@ -85,15 +85,15 @@ function openClipEditor({ clip = null, onSaved } = {}) {
     <div class="editor-meta">
       <div class="field grow">
         <span>Tags <span class="muted small">(comma separated)</span></span>
-        <input id="ed-tags" class="input" placeholder="work, snippet, todo" value="${escapeHtml(tagsToString(currentTags))}">
+        <input id="ed-tags" class="input" placeholder="work, snippet, todo" aria-label="Tags, comma separated" value="${escapeHtml(tagsToString(currentTags))}">
         <div id="ed-tag-chips" class="tag-cloud"></div>
       </div>
       <div class="field">
         <span>Expires</span>
-        <select id="ed-expiry" class="input select">
+        <select id="ed-expiry" class="input select" aria-label="Expiry">
           ${EXPiry_PRESETS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
         </select>
-        <input type="datetime-local" id="ed-expiry-custom" class="input hidden">
+        <input type="datetime-local" id="ed-expiry-custom" class="input hidden" aria-label="Custom expiry date">
       </div>
     </div>
 

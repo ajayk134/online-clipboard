@@ -78,7 +78,11 @@ function showShareView(token) {
 function wireAuth() {
   $$('#auth-tabs .tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      $$('#auth-tabs .tab').forEach((t) => t.classList.toggle('active', t === tab));
+      $$('#auth-tabs .tab').forEach((t) => {
+        const on = t === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
       const isLogin = tab.dataset.authTab === 'login';
       $('#form-login').classList.toggle('hidden', !isLogin);
       $('#form-register').classList.toggle('hidden', isLogin);
@@ -154,10 +158,11 @@ async function refreshSidebar() {
           onclick: () => { state.tag = state.tag === t.tag ? null : t.tag; state.view = 'all'; markActiveNav(); loadList(); } },
           `${t.tag} · ${t.count}`)));
     }
-    $('#count-all').textContent = statsData.stats.total || '';
-    $('#count-fav').textContent = statsData.stats.favorites || '';
+    const stats = statsData.stats || statsData;
+    $('#count-all').textContent = stats.total || '';
+    $('#count-fav').textContent = stats.favorites || '';
     $('#side-stats').textContent =
-      `${statsData.stats.total} clips · ${statsData.stats.copies} copies · ${statsData.stats.views} share views`;
+      `${stats.total} clips · ${stats.copies} copies · ${stats.views} share views`;
   } catch { /* non-fatal */ }
 }
 
@@ -230,8 +235,10 @@ function closeDrawer() {
 
 function toggleUserMenu(force) {
   const dd = $('#user-dropdown');
+  const btn = $('#btn-user');
   const show = force !== undefined ? force : dd.classList.contains('hidden');
   dd.classList.toggle('hidden', !show);
+  if (btn) btn.setAttribute('aria-expanded', show ? 'true' : 'false');
 }
 
 // ---------------------------------------------------------------------------
@@ -343,10 +350,11 @@ function renderCard(item) {
   hydrateIcons(card);
   $('[data-fav]', card).addEventListener('click', async (e) => {
     e.stopPropagation();
+    const btn = e.currentTarget;
     try {
       const updated = await api(`/api/clips/${item.id}/flags`, { method: 'PATCH', body: { isFavorite: !item.isFavorite } });
       item.isFavorite = updated.isFavorite;
-      e.currentTarget.classList.toggle('on', updated.isFavorite);
+      btn.classList.toggle('on', updated.isFavorite);
       refreshSidebar();
     } catch (err) { toast(err.message, 'error'); }
   });
@@ -414,8 +422,10 @@ async function openDetail(id, { focusShare = false } = {}) {
       <button class="btn" id="dt-share">${icon('share')} Share</button>
       <button class="btn" id="dt-qr">${icon('qr')} QR</button>
       <a class="btn" id="dt-dl" href="/api/clips/${clip.id}/export" download>${icon('download')} Save</a>
-      <button class="btn icon ${clip.isFavorite ? 'fav-on' : ''}" id="dt-fav" aria-label="Favorite">${icon('star')}</button>
-      <button class="btn icon ${clip.isPinned ? 'fav-on' : ''}" id="dt-pin" aria-label="Pin">${icon('pin')}</button>
+      <span class="detail-icon-actions">
+        <button class="btn icon ${clip.isFavorite ? 'fav-on' : ''}" id="dt-fav" aria-label="Favorite" aria-pressed="${clip.isFavorite}">${icon('star')}</button>
+        <button class="btn icon ${clip.isPinned ? 'fav-on' : ''}" id="dt-pin" aria-label="Pin" aria-pressed="${clip.isPinned}">${icon('pin')}</button>
+      </span>
     </div>
   `;
   hydrateIcons(body);
@@ -434,15 +444,19 @@ async function openDetail(id, { focusShare = false } = {}) {
     openClipEditor({ clip, onSaved: afterSave });
   });
   $('#dt-fav', body).addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
     const updated = await api(`/api/clips/${clip.id}/flags`, { method: 'PATCH', body: { isFavorite: !clip.isFavorite } });
     clip.isFavorite = updated.isFavorite;
-    e.currentTarget.classList.toggle('fav-on', updated.isFavorite);
+    btn.classList.toggle('fav-on', updated.isFavorite);
+    btn.setAttribute('aria-pressed', String(updated.isFavorite));
     loadList(); refreshSidebar();
   });
   $('#dt-pin', body).addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
     const updated = await api(`/api/clips/${clip.id}/flags`, { method: 'PATCH', body: { isPinned: !clip.isPinned } });
     clip.isPinned = updated.isPinned;
-    e.currentTarget.classList.toggle('fav-on', updated.isPinned);
+    btn.classList.toggle('fav-on', updated.isPinned);
+    btn.setAttribute('aria-pressed', String(updated.isPinned));
     loadList();
   });
   $('#dt-share', body).addEventListener('click', () => {
@@ -595,16 +609,16 @@ function openSettings() {
     el('hr'),
     el('h4', {}, 'Change password'),
     el('form', { class: 'stack', id: 'st-pass-form' }, [
-      el('input', { class: 'input', type: 'password', placeholder: 'Current password', required: true, autocomplete: 'current-password' }),
-      el('input', { class: 'input', type: 'password', placeholder: 'New password', required: true, minlength: 8, autocomplete: 'new-password' }),
-      el('input', { class: 'input', type: 'password', placeholder: 'Confirm new password', required: true, minlength: 8, autocomplete: 'new-password' }),
+      el('input', { class: 'input', type: 'password', placeholder: 'Current password', 'aria-label': 'Current password', required: true, autocomplete: 'current-password' }),
+      el('input', { class: 'input', type: 'password', placeholder: 'New password', 'aria-label': 'New password', required: true, minlength: 8, autocomplete: 'new-password' }),
+      el('input', { class: 'input', type: 'password', placeholder: 'Confirm new password', 'aria-label': 'Confirm new password', required: true, minlength: 8, autocomplete: 'new-password' }),
       el('p', { class: 'form-error hidden' }),
       el('button', { class: 'btn primary', type: 'submit' }, 'Update password'),
     ]),
     el('hr'),
     el('p', { class: 'muted small' }, 'Signing out everywhere invalidates other sessions after a password change.'),
     el('div', { class: 'row gap end' }, [
-      el('button', { class: 'btn danger', id: 'st-logout' }, [icon('logout'), ' Sign out']),
+      el('button', { class: 'btn danger', id: 'st-logout', html: `${icon('logout')} Sign out` }),
     ]),
   ]);
   hydrateIcons(body);
@@ -737,16 +751,17 @@ function renderSharedContent($box, data) {
   const wrap = el('div', { class: 'shared-content' });
   renderClipContent(wrap, data);
   const note = data.consumed
-    ? el('div', { class: 'share-notice warn' }, [icon('clock'), ' One-time link — this content will not be shown again.'])
+    ? el('div', { class: 'share-notice warn', html: `${icon('clock')} One-time link — this content will not be shown again.` })
     : null;
 
   const actions = el('div', { class: 'row gap share-actions' }, [
     el('button', { class: 'btn primary', html: `${icon('copy')} Copy to clipboard`, onclick: async (e) => {
+      const btn = e.currentTarget;
       const text = data.contentType === 'richtext' ? htmlToText(data.content) : data.content;
       await copyToClipboard(text);
-      e.currentTarget.innerHTML = `${icon('check')} Copied`;
-      hydrateIcons(e.currentTarget);
-      setTimeout(() => { e.currentTarget.innerHTML = `${icon('copy')} Copy to clipboard`; hydrateIcons(e.currentTarget); }, 2000);
+      btn.innerHTML = `${icon('check')} Copied`;
+      hydrateIcons(btn);
+      setTimeout(() => { btn.innerHTML = `${icon('copy')} Copy to clipboard`; hydrateIcons(btn); }, 2000);
     } }),
     el('a', { class: 'btn', href: '#', id: 'share-download', html: `${icon('download')} Download` }),
   ]);

@@ -119,41 +119,79 @@ function toast(message, type = 'info', ms = 3200) {
 }
 
 // ---------- modals ----------
-function openModal(contentNode, { onClose } = {}) {
+const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const modalStack = [];
+
+function openModal(contentNode, { onClose, labelledBy } = {}) {
   const root = $('#modal-root');
-  const overlay = el('div', { class: 'modal-overlay' }, [
-    el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' }, [
-      el('button', { class: 'btn icon ghost modal-close', html: icon('x'), 'aria-label': 'Close',
-        onclick: () => close() }),
-      contentNode,
-    ]),
-  ]);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
-  const escHandler = (e) => { if (e.key === 'Escape') close(); };
+  const previouslyFocused = document.activeElement;
+  const modalEl = el('div', {
+    class: 'modal', role: 'dialog', 'aria-modal': 'true', tabindex: '-1',
+    ...(labelledBy ? { 'aria-labelledby': labelledBy } : {}),
+  });
+  const overlay = el('div', { class: 'modal-overlay' }, [modalEl]);
+  modalEl.append(
+    el('button', {
+      class: 'btn icon ghost modal-close', html: icon('x'), type: 'button',
+      'aria-label': 'Close dialog', onclick: () => close(),
+    }),
+    contentNode,
+  );
+
+  const instance = { overlay, close };
+  const isTop = () => modalStack[modalStack.length - 1] === instance;
+
+  function onKey(e) {
+    if (!isTop()) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const nodes = $$(FOCUSABLE, modalEl).filter((n) => n.offsetParent !== null || n === document.activeElement);
+    if (!nodes.length) { e.preventDefault(); modalEl.focus(); return; }
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === modalEl)) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  }
+
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay && isTop()) close(); });
+
   function close() {
+    if (!modalStack.includes(instance)) return;
+    modalStack.splice(modalStack.indexOf(instance), 1);
+    document.removeEventListener('keydown', onKey);
     overlay.remove();
-    document.removeEventListener('keydown', escHandler);
-    document.body.classList.remove('modal-open');
+    if (!modalStack.length) document.body.classList.remove('modal-open');
+    if (previouslyFocused && previouslyFocused.isConnected) {
+      try { previouslyFocused.focus(); } catch { /* noop */ }
+    }
     if (onClose) onClose();
   }
-  document.addEventListener('keydown', escHandler);
+
+  modalStack.push(instance);
+  document.addEventListener('keydown', onKey);
   document.body.classList.add('modal-open');
   root.append(overlay);
   hydrateIcons(overlay);
+  requestAnimationFrame(() => modalEl.focus());
   return { close, overlay };
 }
 
 function confirmDialog(message, { danger = true, confirmText = 'Delete' } = {}) {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
     const body = el('div', { class: 'confirm-body' }, [
-      el('h3', {}, 'Are you sure?'),
+      el('h3', { id: 'confirm-title' }, 'Are you sure?'),
       el('p', { class: 'muted' }, message),
       el('div', { class: 'row gap end' }, [
-        el('button', { class: 'btn ghost', onclick: () => { m.close(); resolve(false); } }, 'Cancel'),
-        el('button', { class: `btn ${danger ? 'danger' : 'primary'}`, onclick: () => { m.close(); resolve(true); } }, confirmText),
+        el('button', { class: 'btn ghost', onclick: () => { finish(false); m.close(); } }, 'Cancel'),
+        el('button', { class: `btn ${danger ? 'danger' : 'primary'}`, onclick: () => { finish(true); m.close(); } }, confirmText),
       ]),
     ]);
-    const m = openModal(body, { onClose: () => resolve(false) });
+    const m = openModal(body, { onClose: () => finish(false), labelledBy: 'confirm-title' });
   });
 }
 

@@ -32,11 +32,11 @@
           <h1>Online Clipboard</h1>
           <p class="muted">Your snippets, everywhere. Secure sharing built in.</p>
         </div>
-        <div class="tabs" id="auth-tabs">
-          <button class="tab active" data-auth-tab="login">Sign in</button>
-          <button class="tab" data-auth-tab="register">Create account</button>
+        <div class="tabs" id="auth-tabs" role="tablist" aria-label="Authentication">
+          <button class="tab active" data-auth-tab="login" role="tab" aria-selected="true" aria-controls="form-login">Sign in</button>
+          <button class="tab" data-auth-tab="register" role="tab" aria-selected="false" aria-controls="form-register">Create account</button>
         </div>
-        <form id="form-login" class="stack" autocomplete="on">
+        <form id="form-login" class="stack" autocomplete="on" role="tabpanel">
           <label class="field">
             <span>Username or email</span>
             <input type="text" class="input" id="login-identifier" name="username" required autocomplete="username">
@@ -48,7 +48,7 @@
           <p class="form-error hidden" id="login-error"></p>
           <button type="submit" class="btn primary block">Sign in</button>
         </form>
-        <form id="form-register" class="stack hidden" autocomplete="on">
+        <form id="form-register" class="stack hidden" autocomplete="on" role="tabpanel">
           <label class="field">
             <span>Username</span>
             <input type="text" class="input" id="reg-username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username">
@@ -76,23 +76,23 @@
           <span class="brand-icon" data-icon="clipboard"></span>
           <span class="brand-name">Online Clipboard</span>
         </a>
-        <div class="search-box">
+        <div class="search-box" role="search">
           <span class="search-icon" data-icon="search"></span>
-          <input id="search-input" type="search" placeholder="Search clips, tags, content…" autocomplete="off">
+          <input id="search-input" type="search" placeholder="Search clips, tags, content…" autocomplete="off" aria-label="Search clips">
         </div>
-        <button id="btn-theme" class="btn icon ghost" data-icon="moon" aria-label="Toggle theme"></button>
+        <button id="btn-theme" class="btn icon ghost" data-icon="moon" aria-label="Toggle color theme"></button>
         <div class="user-menu">
-          <button id="btn-user" class="btn ghost user-chip">
+          <button id="btn-user" class="btn ghost user-chip" aria-haspopup="menu" aria-expanded="false">
             <span data-icon="user"></span><span id="user-name">…</span>
           </button>
-          <div id="user-dropdown" class="dropdown hidden">
+          <div id="user-dropdown" class="dropdown hidden" role="menu">
             <div class="dropdown-head">
               <strong id="user-full"></strong>
               <span class="muted" id="user-email"></span>
             </div>
-            <button class="dropdown-item" data-action="settings">Settings</button>
-            <button class="dropdown-item" data-action="export">Export data</button>
-            <button class="dropdown-item danger" data-action="logout">Sign out</button>
+            <button class="dropdown-item" data-action="settings"><span data-icon="settings"></span>Settings</button>
+            <button class="dropdown-item" data-action="export"><span data-icon="download"></span>Export data</button>
+            <button class="dropdown-item danger" data-action="logout"><span data-icon="logout"></span>Sign out</button>
           </div>
         </div>
       </header>
@@ -103,7 +103,7 @@
           <button id="btn-new" class="btn primary block">
             <span data-icon="plus"></span> New clip
           </button>
-          <nav class="side-nav">
+          <nav class="side-nav" aria-label="Views">
             <button class="side-item active" data-nav="all"><span data-icon="clipboard"></span>All clips<span class="count" id="count-all"></span></button>
             <button class="side-item" data-nav="favorites"><span data-icon="star"></span>Favorites<span class="count" id="count-fav"></span></button>
             <button class="side-item" data-nav="pinned"><span data-icon="pin"></span>Pinned</button>
