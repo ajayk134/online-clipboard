@@ -112,7 +112,7 @@ function openClipEditor({ clip = null, onSaved } = {}) {
         </label>
         <label class="field">
           <span>Share password <span class="muted small">(optional${clip && clip.hasPassword ? ', set' : ''})</span></span>
-          <input type="password" id="ed-share-password" placeholder="${clip && clip.hasPassword ? '•••••••• (unchanged)' : 'Leave empty for no password'}" autocomplete="new-password">
+          <input type="password" class="input" id="ed-share-password" placeholder="${clip && clip.hasPassword ? '•••••••• (unchanged)' : 'Leave empty for no password'}" autocomplete="new-password">
         </label>
         <div id="ed-share-result" class="share-result hidden"></div>
       </div>

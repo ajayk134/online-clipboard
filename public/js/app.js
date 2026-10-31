@@ -517,7 +517,7 @@ function renderSharePanel($panel, clip) {
         <div class="share-opts">
           <label class="switch-row"><input type="checkbox" id="sh-onetime" ${clip.isOneTime ? 'checked' : ''}><span class="switch"></span>One-time link</label>
           <label class="field grow"><span>New password (optional)</span>
-            <input type="password" id="sh-pass" placeholder="${clip.hasPassword ? 'Leave empty to keep current' : 'No password set'}"></label>
+            <input type="password" class="input" id="sh-pass" placeholder="${clip.hasPassword ? 'Leave empty to keep current' : 'No password set'}"></label>
           <button class="btn small" id="sh-apply">Apply</button>
         </div>` : `<p class="muted small">Share links let anyone with the URL view this clip. Optional password and one-time burn supported.</p>`}
     </div>`;

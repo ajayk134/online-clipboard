@@ -39,11 +39,11 @@
         <form id="form-login" class="stack" autocomplete="on">
           <label class="field">
             <span>Username or email</span>
-            <input type="text" id="login-identifier" name="username" required autocomplete="username">
+            <input type="text" class="input" id="login-identifier" name="username" required autocomplete="username">
           </label>
           <label class="field">
             <span>Password</span>
-            <input type="password" id="login-password" name="password" required autocomplete="current-password">
+            <input type="password" class="input" id="login-password" name="password" required autocomplete="current-password">
           </label>
           <p class="form-error hidden" id="login-error"></p>
           <button type="submit" class="btn primary block">Sign in</button>
@@ -51,15 +51,15 @@
         <form id="form-register" class="stack hidden" autocomplete="on">
           <label class="field">
             <span>Username</span>
-            <input type="text" id="reg-username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username">
+            <input type="text" class="input" id="reg-username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username">
           </label>
           <label class="field">
             <span>Email</span>
-            <input type="email" id="reg-email" required autocomplete="email">
+            <input type="email" class="input" id="reg-email" required autocomplete="email">
           </label>
           <label class="field">
             <span>Password</span>
-            <input type="password" id="reg-password" required minlength="8" autocomplete="new-password">
+            <input type="password" class="input" id="reg-password" required minlength="8" autocomplete="new-password">
             <small class="muted">At least 8 characters with a letter and a number.</small>
           </label>
           <p class="form-error hidden" id="register-error"></p>

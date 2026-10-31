@@ -91,7 +91,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 
 /* ---------- inputs ---------- */
 .input {
-  width: 100%; padding: 9px 12px; border-radius: var(--radius-sm);
+  width: 100%; min-height: 50px; padding: 11px 14px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--surface); color: var(--text);
   font: inherit; transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -384,7 +384,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
   }
   .sidebar.open { transform: none; }
   .overlay { position: fixed; inset: 0; z-index: 130; background: rgb(2 6 23 / 0.5); }
-  .dropdown { right: 8px; left: 8px; min-width: auto; width: calc(100vw - 16px); }
+  .dropdown { right: 8px; left: 8px; min-width: auto; width: auto; }
   .content { padding: 14px 14px 90px; }
   .brand-name { display: none; }
   .search-box { max-width: none; }
