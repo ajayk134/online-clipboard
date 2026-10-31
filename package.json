@@ -1,0 +1,48 @@
+{
+  "name": "online-clipboard",
+  "version": "1.0.0",
+  "description": "Production-ready online clipboard: rich text, code snippets, history, search, tags, favorites, secure sharing, PWA",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --runInBand --forceExit",
+    "postinstall": "node scripts/sync-vendor.js",
+    "icons": "node scripts/gen-icons.js"
+  },
+  "keywords": [
+    "clipboard",
+    "paste",
+    "pwa",
+    "notes"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "qrcode": "^1.5.4",
+    "quill": "^2.0.3",
+    "sanitize-html": "^2.17.0",
+    "@highlightjs/cdn-assets": "^11.11.1"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1"
+  },
+  "type": "commonjs",
+  "overrides": {
+    "htmlparser2": "^9.1.0"
+  }
+}

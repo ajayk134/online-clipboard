@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Online Clipboard</title>
+  <meta name="description" content="A fast, secure online clipboard with rich text, code snippets, sharing and PWA support">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon-64.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/vendor/css/quill.snow.css">
+  <link id="hljs-light" rel="stylesheet" href="/vendor/css/hljs-github.css">
+  <link id="hljs-dark" rel="stylesheet" href="/vendor/css/hljs-github-dark.css" disabled>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script defer src="/vendor/js/quill.js"></script>
+  <script defer src="/vendor/js/highlight.min.js"></script>
+  <script defer src="/js/common.js"></script>
+  <script defer src="/js/editor.js"></script>
+  <script defer src="/js/app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <!-- Auth view -->
+    <section id="view-auth" class="view auth-view hidden">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <span class="brand-icon" data-icon="clipboard"></span>
+          <h1>Online Clipboard</h1>
+          <p class="muted">Your snippets, everywhere. Secure sharing built in.</p>
+        </div>
+        <div class="tabs" id="auth-tabs">
+          <button class="tab active" data-auth-tab="login">Sign in</button>
+          <button class="tab" data-auth-tab="register">Create account</button>
+        </div>
+        <form id="form-login" class="stack" autocomplete="on">
+          <label class="field">
+            <span>Username or email</span>
+            <input type="text" id="login-identifier" name="username" required autocomplete="username">
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input type="password" id="login-password" name="password" required autocomplete="current-password">
+          </label>
+          <p class="form-error hidden" id="login-error"></p>
+          <button type="submit" class="btn primary block">Sign in</button>
+        </form>
+        <form id="form-register" class="stack hidden" autocomplete="on">
+          <label class="field">
+            <span>Username</span>
+            <input type="text" id="reg-username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username">
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input type="email" id="reg-email" required autocomplete="email">
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input type="password" id="reg-password" required minlength="8" autocomplete="new-password">
+            <small class="muted">At least 8 characters with a letter and a number.</small>
+          </label>
+          <p class="form-error hidden" id="register-error"></p>
+          <button type="submit" class="btn primary block">Create account</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Main app shell -->
+    <div id="view-main" class="hidden">
+      <header class="topbar">
+        <button id="btn-menu" class="btn icon ghost only-mobile" data-icon="menu" aria-label="Menu"></button>
+        <a class="brand" href="/">
+          <span class="brand-icon" data-icon="clipboard"></span>
+          <span class="brand-name">Online Clipboard</span>
+        </a>
+        <div class="search-box">
+          <span class="search-icon" data-icon="search"></span>
+          <input id="search-input" type="search" placeholder="Search clips, tags, content…" autocomplete="off">
+        </div>
+        <button id="btn-theme" class="btn icon ghost" data-icon="moon" aria-label="Toggle theme"></button>
+        <div class="user-menu">
+          <button id="btn-user" class="btn ghost user-chip">
+            <span data-icon="user"></span><span id="user-name">…</span>
+          </button>
+          <div id="user-dropdown" class="dropdown hidden">
+            <div class="dropdown-head">
+              <strong id="user-full"></strong>
+              <span class="muted" id="user-email"></span>
+            </div>
+            <button class="dropdown-item" data-action="settings">Settings</button>
+            <button class="dropdown-item" data-action="export">Export data</button>
+            <button class="dropdown-item danger" data-action="logout">Sign out</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="layout">
+        <div id="sidebar-overlay" class="overlay hidden"></div>
+        <aside id="sidebar" class="sidebar">
+          <button id="btn-new" class="btn primary block">
+            <span data-icon="plus"></span> New clip
+          </button>
+          <nav class="side-nav">
+            <button class="side-item active" data-nav="all"><span data-icon="clipboard"></span>All clips<span class="count" id="count-all"></span></button>
+            <button class="side-item" data-nav="favorites"><span data-icon="star"></span>Favorites<span class="count" id="count-fav"></span></button>
+            <button class="side-item" data-nav="pinned"><span data-icon="pin"></span>Pinned</button>
+            <button class="side-item" data-nav="history"><span data-icon="history"></span>History</button>
+          </nav>
+          <div class="side-section">
+            <div class="side-title">Tags</div>
+            <div id="tag-list" class="tag-cloud"><span class="muted small">No tags yet</span></div>
+          </div>
+          <div class="side-section">
+            <div class="side-title">Data</div>
+            <div class="side-actions">
+              <button class="btn outline small block" data-action="import"><span data-icon="upload"></span>Import JSON</button>
+              <button class="btn outline small block" data-action="export"><span data-icon="download"></span>Export JSON</button>
+            </div>
+            <input type="file" id="import-file" accept="application/json,.json" class="hidden">
+          </div>
+          <div class="side-footer muted small" id="side-stats"></div>
+        </aside>
+
+        <main class="content">
+          <div class="filterbar">
+            <div class="chip-row" id="type-filter">
+              <button class="chip active" data-type="">All types</button>
+              <button class="chip" data-type="text">Text</button>
+              <button class="chip" data-type="richtext">Rich text</button>
+              <button class="chip" data-type="code">Code</button>
+            </div>
+            <select id="sort-select" class="input select small" aria-label="Sort">
+              <option value="created">Newest first</option>
+              <option value="updated">Recently updated</option>
+              <option value="title">Title A→Z</option>
+              <option value="copies">Most copied</option>
+            </select>
+          </div>
+          <div id="clip-list" class="clip-grid"></div>
+          <div id="empty-state" class="empty-state hidden">
+            <span class="empty-icon" data-icon="clipboard"></span>
+            <h2 id="empty-title">No clips yet</h2>
+            <p class="muted" id="empty-hint">Create your first clip — paste text, write rich content or code.</p>
+            <button class="btn primary" data-action="new">Create clip</button>
+          </div>
+          <button id="btn-fab" class="fab only-mobile" data-icon="plus" aria-label="New clip"></button>
+        </main>
+      </div>
+    </div>
+
+    <!-- Share view -->
+    <section id="view-share" class="view hidden">
+      <div class="share-wrap" id="share-content"></div>
+    </section>
+
+    <!-- Modals root -->
+    <div id="modal-root"></div>
+  </div>
+</body>
+</html>
