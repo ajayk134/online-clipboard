@@ -8,15 +8,9 @@ import {
 } from '../models';
 
 class MockApiService {
-  post = jasmine.createSpyObj('post', ['post']) as unknown as {
-    post<T>(url: string, body?: unknown): Promise<T>;
-  };
-  get = jasmine.createSpyObj('get', ['get']) as unknown as {
-    get<T>(url: string): Promise<T>;
-  };
-  put = jasmine.createSpyObj('put', ['put']) as unknown as {
-    put<T>(url: string, body?: unknown): Promise<T>;
-  };
+  post: any = jasmine.createSpy('post');
+  get: any = jasmine.createSpy('get');
+  put: any = jasmine.createSpy('put');
 }
 
 class MockRouter {

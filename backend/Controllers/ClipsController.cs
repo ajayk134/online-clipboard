@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 using OnlineClipboard.Models;
 using OnlineClipboard.Services;
@@ -9,6 +12,8 @@ namespace OnlineClipboard.Controllers;
 
 [ApiController]
 [Route("api/clips")]
+[Authorize]
+[EnableRateLimiting("write")]
 public class ClipsController : ControllerBase
 {
     private readonly IMongoDbService _db;
@@ -16,15 +21,18 @@ public class ClipsController : ControllerBase
     private readonly IPasswordService _password;
     private readonly IShareService _share;
     private readonly ISanitizationService _sanitizer;
+    private readonly string? _publicBaseUrl;
 
     public ClipsController(IMongoDbService db, IJwtService jwt, IPasswordService password,
-        IShareService share, ISanitizationService sanitizer)
+        IShareService share, ISanitizationService sanitizer, IConfiguration configuration)
     {
         _db = db;
         _jwt = jwt;
         _password = password;
         _share = share;
         _sanitizer = sanitizer;
+        _publicBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
+            ?? configuration["PublicBaseUrl"];
     }
 
     private long? UserId => HttpContext.GetUserIdLong();
@@ -40,6 +48,14 @@ public class ClipsController : ControllerBase
             "code" => ContentType.Code,
             _ => ContentType.Text,
         };
+    }
+
+    private string GetBaseUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(_publicBaseUrl))
+            return _publicBaseUrl.TrimEnd('/');
+        var req = HttpContext.Request;
+        return $"{req.Scheme}://{req.Host}";
     }
 
     private static ClipDto ToDto(Clip c, string? baseUrl = null)
@@ -72,6 +88,10 @@ public class ClipsController : ControllerBase
             HasPassword = !string.IsNullOrEmpty(c.PasswordHash),
         };
     }
+
+    // Centralized ownership lookup: a clip is only accessible to its owning user.
+    private async Task<Clip?> GetClipForUser(long id, long userId) =>
+        await _db.Clips.Find(c => c.Id == id && c.UserId == userId).FirstOrDefaultAsync();
 
     [HttpGet]
     public async Task<IActionResult> List(
@@ -315,7 +335,7 @@ public class ClipsController : ControllerBase
         var userId = UserId;
         if (!userId.HasValue) return UnauthorizedResult();
 
-        var clip = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var clip = await GetClipForUser(id, userId.Value);
         if (clip == null)
             return NotFound(new { error = "not_found", message = "Clip not found" });
 
@@ -328,7 +348,7 @@ public class ClipsController : ControllerBase
         var userId = UserId;
         if (!userId.HasValue) return UnauthorizedResult();
 
-        var clip = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var clip = await GetClipForUser(id, userId.Value);
         if (clip == null)
             return NotFound(new { error = "not_found", message = "Clip not found" });
 
@@ -361,7 +381,7 @@ public class ClipsController : ControllerBase
             update = update.Set(c => c.ExpiresAt, req.ExpiresAt.Value);
 
         await _db.Clips.UpdateOneAsync(c => c.Id == id && c.UserId == userId.Value, update);
-        var updated = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var updated = await GetClipForUser(id, userId.Value);
 
         return Ok(ToDto(updated!, GetBaseUrl()));
     }
@@ -372,7 +392,7 @@ public class ClipsController : ControllerBase
         var userId = UserId;
         if (!userId.HasValue) return UnauthorizedResult();
 
-        var clip = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var clip = await GetClipForUser(id, userId.Value);
         if (clip == null)
             return NotFound(new { error = "not_found", message = "Clip not found" });
 
@@ -389,7 +409,7 @@ public class ClipsController : ControllerBase
         var userId = UserId;
         if (!userId.HasValue) return UnauthorizedResult();
 
-        var clip = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var clip = await GetClipForUser(id, userId.Value);
         if (clip == null)
             return NotFound(new { error = "not_found", message = "Clip not found" });
 
@@ -400,7 +420,7 @@ public class ClipsController : ControllerBase
             update = update.Set(c => c.IsPinned, req.IsPinned.Value);
 
         await _db.Clips.UpdateOneAsync(c => c.Id == id && c.UserId == userId.Value, update);
-        var updated = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var updated = await GetClipForUser(id, userId.Value);
 
         return Ok(ToDto(updated!, GetBaseUrl()));
     }
@@ -424,7 +444,7 @@ public class ClipsController : ControllerBase
         var userId = UserId;
         if (!userId.HasValue) return UnauthorizedResult();
 
-        var clip = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var clip = await GetClipForUser(id, userId.Value);
         if (clip == null)
             return NotFound(new { error = "not_found", message = "Clip not found" });
 
@@ -450,7 +470,7 @@ public class ClipsController : ControllerBase
         }
 
         await _db.Clips.UpdateOneAsync(c => c.Id == id && c.UserId == userId.Value, update);
-        var updated = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var updated = await GetClipForUser(id, userId.Value);
 
         return Ok(ToDto(updated!, GetBaseUrl()));
     }
@@ -472,7 +492,7 @@ public class ClipsController : ControllerBase
         var userId = UserId;
         if (!userId.HasValue) return UnauthorizedResult();
 
-        var clip = await _db.Clips.Find(c => c.Id == id && c.UserId == userId.Value).FirstOrDefaultAsync();
+        var clip = await GetClipForUser(id, userId.Value);
         if (clip == null)
             return NotFound(new { error = "not_found", message = "Clip not found" });
 
@@ -497,12 +517,6 @@ public class ClipsController : ControllerBase
         };
 
         return File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"{clip.Title}.{ext}");
-    }
-
-    private string GetBaseUrl()
-    {
-        var req = HttpContext.Request;
-        return $"{req.Scheme}://{req.Host}";
     }
 
     public class ImportRequest

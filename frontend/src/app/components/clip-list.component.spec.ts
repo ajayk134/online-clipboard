@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { ClipListComponent } from './clip-list.component';
 import { ClipService } from '../services/clip.service';
 import { Router } from '@angular/router';
 import { Clip, ContentType } from '../models';
 
 class MockClipService {
-  clips = jasmine.createSpyObj('clips', ['clips']) as unknown as () => Clip[];
-  total = jasmine.createSpyObj('total', ['total']) as unknown as () => number;
+  clips = signal<Clip[]>([]);
+  total = signal(0);
   getClips = jasmine.createSpy('getClips').and.returnValue(Promise.resolve({ items: [], total: 0 }));
   getTags = jasmine.createSpy('getTags').and.returnValue(Promise.resolve({ tags: [] }));
   getStats = jasmine.createSpy('getStats').and.returnValue(Promise.resolve({
@@ -44,6 +45,7 @@ const makeClip = (overrides: Partial<Clip>): Clip => ({
 describe('ClipListComponent', () => {
   let component: ClipListComponent;
   let clipService: MockClipService;
+  let router: MockRouter;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -55,10 +57,11 @@ describe('ClipListComponent', () => {
     });
     component = TestBed.inject(ClipListComponent);
     clipService = TestBed.inject(ClipService) as unknown as MockClipService;
+    router = TestBed.inject(Router) as unknown as MockRouter;
   });
 
   it('visibleClips filters by search query', () => {
-    clipService.clips.and.returnValue([
+    clipService.clips.set([
       makeClip({ title: 'Alpha', content: 'x' }),
       makeClip({ title: 'Beta', content: 'gamma' }),
     ]);
@@ -69,7 +72,7 @@ describe('ClipListComponent', () => {
   });
 
   it('visibleClips filters by content type', () => {
-    clipService.clips.and.returnValue([
+    clipService.clips.set([
       makeClip({ contentType: 'text' }),
       makeClip({ contentType: 'code' }),
       makeClip({ contentType: 'richtext' }),
@@ -80,7 +83,7 @@ describe('ClipListComponent', () => {
   });
 
   it('visibleClips filters by favorite', () => {
-    clipService.clips.and.returnValue([
+    clipService.clips.set([
       makeClip({ isFavorite: true }),
       makeClip({ isFavorite: false }),
       makeClip({ isFavorite: true }),
@@ -91,7 +94,7 @@ describe('ClipListComponent', () => {
   });
 
   it('visibleClips filters by pinned', () => {
-    clipService.clips.and.returnValue([
+    clipService.clips.set([
       makeClip({ isPinned: true }),
       makeClip({ isPinned: false }),
     ]);
@@ -101,15 +104,14 @@ describe('ClipListComponent', () => {
   });
 
   it('filteredCount reports number of visible clips', () => {
-    clipService.clips.and.returnValue([makeClip({}), makeClip({}), makeClip({})]);
+    clipService.clips.set([makeClip({}), makeClip({}), makeClip({})]);
     expect(component.filteredCount()).toBe(3);
   });
 
   it('totalPages computes pages from total and pageSize', () => {
-    clipService.total.and.returnValue(45);
-    component.pageSize = 20;
+    clipService.total.set(45);
     expect(component.totalPages()).toBe(3);
-    clipService.total.and.returnValue(0);
+    clipService.total.set(0);
     expect(component.totalPages()).toBe(1);
   });
 
@@ -139,11 +141,11 @@ describe('ClipListComponent', () => {
 
   it('openEditor navigates to new editor when no clip', () => {
     component.openEditor();
-    expect(MockRouter.prototype.navigate).toHaveBeenCalledWith(['/app/editor', 'new']);
+    expect(router.navigate).toHaveBeenCalledWith(['/app/editor', 'new']);
   });
 
   it('openEditor navigates to existing editor when clip given', () => {
     component.openEditor({ id: 7 } as Clip);
-    expect(MockRouter.prototype.navigate).toHaveBeenCalledWith(['/app/editor', 7]);
+    expect(router.navigate).toHaveBeenCalledWith(['/app/editor', 7]);
   });
 });

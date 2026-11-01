@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -19,13 +18,25 @@ public class JwtService : IJwtService
 {
     private readonly string _secret;
     private readonly string _issuer = "online-clipboard";
-    private readonly TimeSpan _expiry = TimeSpan.FromDays(7);
+    private readonly string _audience = "online-clipboard";
+    private readonly TimeSpan _expiry;
 
     public JwtService(IConfiguration configuration)
     {
-        _secret = configuration["JWT_SECRET"]
-                  ?? Environment.GetEnvironmentVariable("JWT_SECRET")
+        _secret = Environment.GetEnvironmentVariable("JWT_SECRET")
+                  ?? configuration["Jwt:Secret"]
                   ?? throw new InvalidOperationException("JWT_SECRET is not configured");
+
+        if (string.IsNullOrWhiteSpace(_secret) || _secret == "dev-secret-change-me")
+        {
+            throw new InvalidOperationException("JWT_SECRET is not configured. Set a strong random value.");
+        }
+
+        var expiryDays = Environment.GetEnvironmentVariable("JWT_EXPIRY_DAYS")
+                         ?? configuration["Jwt:ExpiryDays"];
+        _expiry = !string.IsNullOrWhiteSpace(expiryDays) && double.TryParse(expiryDays, out var days) && days > 0
+            ? TimeSpan.FromDays(days)
+            : TimeSpan.FromDays(7);
     }
 
     public string GenerateToken(User user)
@@ -44,7 +55,7 @@ public class JwtService : IJwtService
 
         var token = new JwtSecurityToken(
             issuer: _issuer,
-            audience: _issuer,
+            audience: _audience,
             claims: claims,
             expires: DateTime.UtcNow.Add(_expiry),
             signingCredentials: credentials);
@@ -68,7 +79,7 @@ public class JwtService : IJwtService
                 ValidateIssuer = true,
                 ValidIssuer = _issuer,
                 ValidateAudience = true,
-                ValidAudience = _issuer,
+                ValidAudience = _audience,
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = key,
                 ValidateLifetime = true,

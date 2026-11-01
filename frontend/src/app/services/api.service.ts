@@ -5,15 +5,17 @@ import {
   HttpHeaders,
   HttpParams,
 } from '@angular/common/http';
-import { catchError, delay, retry, throwError, type Observable } from 'rxjs';
+import { catchError, retry, throwError, type Observable } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ApiError } from '../models';
 
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.apiUrl;
+  private readonly baseUrl = environment.apiUrl.replace(/\/$/, '');
 
   private headers(): HttpHeaders {
     const headers = new HttpHeaders({
@@ -28,11 +30,13 @@ export class ApiService {
     };
     if (error instanceof HttpErrorResponse) {
       apiError.statusCode = error.status;
-      apiError.message =
-        error.error?.message ||
-        error.error?.error ||
-        `HTTP ${error.status}` ||
-        'An unexpected error occurred';
+      if (error.error?.message) {
+        apiError.message = error.error.message;
+      } else if (error.error?.error) {
+        apiError.message = error.error.error;
+      } else if (error.status !== 0) {
+        apiError.message = `HTTP ${error.status}`;
+      }
       if (error.error?.errors) {
         apiError.errors = error.error.errors;
       }
@@ -79,7 +83,11 @@ export class ApiService {
       }
     })();
 
-    return firstValueFrom(obs.pipe(retry(1), catchError(this.handleError)));
+    const pipe = IDEMPOTENT_METHODS.has(method)
+      ? obs.pipe(retry(1), catchError(this.handleError))
+      : obs.pipe(catchError(this.handleError));
+
+    return firstValueFrom(pipe);
   }
 
   get<T>(url: string, options?: { params?: Record<string, string | number>; responseType?: 'json' | 'blob' }): Promise<T> {

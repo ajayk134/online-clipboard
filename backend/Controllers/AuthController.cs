@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MongoDB.Driver;
 using OnlineClipboard.Models;
 using OnlineClipboard.Services;
@@ -9,6 +11,7 @@ namespace OnlineClipboard.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly IMongoDbService _db;
@@ -83,6 +86,14 @@ public class AuthController : ControllerBase
         if (user == null || !_password.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new { error = "invalid_credentials", message = "Invalid username or password" });
 
+        // Increment TokenVersion on login so all previously issued tokens are invalidated
+        // (session fixation protection).
+        var update = Builders<User>.Update
+            .Inc(u => u.TokenVersion, 1)
+            .Set(u => u.UpdatedAt, DateTime.UtcNow);
+        await _db.Users.UpdateOneAsync(u => u.Id == user.Id, update);
+        user = await _db.Users.Find(u => u.Id == user.Id).FirstOrDefaultAsync()!;
+
         var token = _jwt.GenerateToken(user);
         return Ok(new AuthResponse { Token = token, User = new UserDto
         {
@@ -91,6 +102,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("me")]
+    [Authorize]
     public async Task<IActionResult> Me()
     {
         var userId = HttpContext.GetUserIdLong();
@@ -108,6 +120,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
+    [Authorize]
     public async Task<IActionResult> Logout()
     {
         var userId = HttpContext.GetUserIdLong();
@@ -127,6 +140,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPut("password")]
+    [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] PasswordRequest req)
     {
         var userId = HttpContext.GetUserIdLong();

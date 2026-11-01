@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 using OnlineClipboard.Models;
 using OnlineClipboard.Services;
@@ -8,20 +9,28 @@ namespace OnlineClipboard.Controllers;
 
 [ApiController]
 [Route("api/share")]
+[EnableRateLimiting("share")]
 public class ShareController : ControllerBase
 {
     private readonly IMongoDbService _db;
     private readonly IPasswordService _password;
     private readonly IShareService _share;
+    private readonly string? _publicBaseUrl;
 
-    public ShareController(IMongoDbService db, IPasswordService password, IShareService share)
+    public ShareController(IMongoDbService db, IPasswordService password, IShareService share,
+        IConfiguration configuration)
     {
         _db = db;
         _password = password;
         _share = share;
+        _publicBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
+            ?? configuration["PublicBaseUrl"];
     }
 
     public record AccessRequest(string? Password);
+
+    private string ShareUrl(string token) =>
+        $"{(_publicBaseUrl ?? string.Empty).TrimEnd('/')}/api/share/{token}";
 
     [HttpGet("{token}/meta")]
     public async Task<IActionResult> Meta(string token)
@@ -47,6 +56,7 @@ public class ShareController : ControllerBase
             expiresAt = clip.ExpiresAt,
             createdAt = clip.CreatedAt,
             excerpt = clip.Excerpt,
+            shareUrl = available ? ShareUrl(token) : null,
         });
     }
 
@@ -94,6 +104,7 @@ public class ShareController : ControllerBase
                 language = updated.Language,
                 consumed = true,
                 expiresAt = updated.ExpiresAt,
+                shareUrl = ShareUrl(token),
             });
         }
 
@@ -114,6 +125,7 @@ public class ShareController : ControllerBase
             language = fetched.Language,
             consumed = false,
             expiresAt = fetched.ExpiresAt,
+            shareUrl = ShareUrl(token),
         });
     }
 

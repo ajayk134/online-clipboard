@@ -135,7 +135,7 @@ export class ClipEditorComponent {
 
   readonly EXPIRY_PRESETS = EXPIRY_PRESETS;
 
-  protected readonly form: Partial<Clip> & { share?: boolean; sharePassword?: string | null; shareOneTime?: boolean } = {
+  public readonly form: Partial<Clip> & { share?: boolean; sharePassword?: string | null; shareOneTime?: boolean } = {
     title: '',
     content: '',
     contentType: 'text' as ContentType,
@@ -149,13 +149,13 @@ export class ClipEditorComponent {
     sharePassword: null,
   };
 
-  protected tagsInput = '';
-  protected readonly expiryPreset = signal<string | null>(null);
+  public tagsInput = '';
+  public readonly expiryPreset = signal<string | null>(null);
   protected readonly hasPassword = signal(false);
   protected readonly sharePassword = '';
 
-  protected readonly isNew = signal(true);
-  protected readonly editingId = signal<number | null>(null);
+  public readonly isNew = signal(true);
+  public readonly editingId = signal<number | null>(null);
 
   protected readonly richHtml = computed(() => this.form.content || '');
 

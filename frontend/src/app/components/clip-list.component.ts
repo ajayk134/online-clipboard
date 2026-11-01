@@ -81,16 +81,16 @@ export class ClipListComponent {
   private readonly router = inject(Router);
 
   protected readonly pageSize = 20;
-  protected readonly page = signal(1);
-  protected readonly sort = signal('updated_desc');
-  protected readonly typeFilter = signal<ContentType | ''>('');
-  protected readonly showFilter = signal<'all' | 'favorite' | 'pinned'>('all');
-  protected readonly searchQ = signal('');
+  public readonly page = signal(1);
+  public readonly sort = signal('updated_desc');
+  public readonly typeFilter = signal<ContentType | ''>('');
+  public readonly showFilter = signal<'all' | 'favorite' | 'pinned'>('all');
+  public readonly searchQ = signal('');
 
-  protected readonly filteredCount = computed(() => this.clipService.clips().length);
-  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.clipService.total() / this.pageSize)));
+  public readonly filteredCount = computed(() => this.clipService.clips().length);
+  public readonly totalPages = computed(() => Math.max(1, Math.ceil(this.clipService.total() / this.pageSize)));
 
-  protected readonly visibleClips = computed(() => {
+  public readonly visibleClips = computed(() => {
     const items = this.clipService.clips();
     const q = this.searchQ().toLowerCase();
     const type = this.typeFilter();

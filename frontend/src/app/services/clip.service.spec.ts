@@ -9,18 +9,10 @@ import {
 } from '../models';
 
 class MockApiService {
-  get = jasmine.createSpyObj('get', ['get']) as unknown as {
-    get<T>(url: string, options?: { params?: Record<string, string | number>; responseType?: 'json' | 'blob' }): Promise<T>;
-  };
-  post = jasmine.createSpyObj('post', ['post']) as unknown as {
-    post<T>(url: string, body?: unknown): Promise<T>;
-  };
-  patch = jasmine.createSpyObj('patch', ['patch']) as unknown as {
-    patch<T>(url: string, body?: unknown): Promise<T>;
-  };
-  delete = jasmine.createSpyObj('delete', ['delete']) as unknown as {
-    delete<T>(url: string): Promise<T>;
-  };
+  get: any = jasmine.createSpy('get');
+  post: any = jasmine.createSpy('post');
+  patch: any = jasmine.createSpy('patch');
+  delete: any = jasmine.createSpy('delete');
 }
 
 describe('ClipService', () => {
@@ -109,7 +101,7 @@ describe('ClipService', () => {
   it('copyClip patches /clips/:id/copy', async () => {
     api.patch = jasmine.createSpy('patch').and.returnValue(Promise.resolve({ ok: true }));
     const res = await service.copyClip(1);
-    expect(api.patch).toHaveBeenCalledWith('/clips/1/copy', undefined);
+    expect(api.patch).toHaveBeenCalledWith('/clips/1/copy');
     expect(res).toEqual({ ok: true });
   });
 

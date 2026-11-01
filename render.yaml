@@ -1,19 +1,29 @@
 services:
   - type: web
     name: online-clipboard-backend
-    env: docker
+    env: node  # native web service; Render free tier does not support Docker web services
     repo: https://github.com/ajayk134/online-clipboard
     rootDir: backend
-    dockerfilePath: Dockerfile
-    dockerContext: .
     region: oregon
     plan: free
     branch: main
     autoDeploy: "yes"
     healthCheckPath: /ready
+    buildCommand: dotnet publish -c Production -o /app/publish
+    startCommand: dotnet /app/publish/OnlineClipboard.dll
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: FRONTEND_URL
+        value: https://online-clipboard-frontend.onrender.com
+      - key: PUBLIC_BASE_URL
+        value: https://online-clipboard-backend.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
 
   - type: static
     name: online-clipboard-frontend
@@ -23,7 +33,7 @@ services:
     plan: free
     branch: main
     autoDeploy: "yes"
-    buildCommand: npm ci && ng build --configuration production
+    buildCommand: node scripts/set-api-url.js && npm ci && ng build --configuration production
     staticPublishPath: dist/online-clipboard-frontend/browser
     envVars:
       - key: API_URL

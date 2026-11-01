@@ -2,64 +2,137 @@
 
 Production-ready online clipboard: rich text, code snippets, history, search, tags, favorites, secure sharing, PWA.
 
-A self-contained, self-hosted clipboard service built with Node.js, Express, and MongoDB. Users can create and organize text, rich-text, and code clips, pin and favorite items, search across content, export/import clips, and share clips securely with optional password protection, one-time links, expiration, and QR codes.
+A self-hosted clipboard service built with **ASP.NET Core .NET 10** (backend) and **Angular 22** (frontend), using **MongoDB** as the datastore and deployed to **Render**. Users can create and organize text, rich-text, and code clips, pin and favorite items, search across content, export/import clips, and share clips securely with optional password protection, one-time links, expiration, and QR codes.
 
 ## Features
 
 - **Clip management** — create, read, update, delete text / rich-text / code clips
 - **Rich text editing** — Quill-powered editor with HTML sanitization
 - **Code snippets** — syntax-aware code clips with language tagging
-- **Search & filtering** — full-text search across title, excerpt, content, and tags; filter by tag, favorite, pinned, content type
+- **Search & filtering** — full-text search across title, content, and tags; filter by tag, favorite, pinned, content type
 - **Organization** — pin, favorite, copy/view counters, audit logging
 - **Secure sharing** — shareable tokens, optional share password, one-time (burn-after-read) links, expiration dates, QR code generation
 - **Import / export** — JSON export/import of clips (up to 500 items per import)
 - **PWA** — installable progressive web app with service worker and manifest
-- **Security** — helmet (CSP, HSTS, etc.), compression, rate limiting, `express-rate-limit`, bcrypt password hashing, JWT authentication, sanitize-html
+- **Authentication** — JWT authentication with bcrypt password hashing, token versioning (logout/password change revokes prior tokens)
+- **Authorization** — `[Authorize]` on all user endpoints, ownership enforcement on all clip resources
+- **Security** — JWT secret enforced from env var (fail fast), production CORS with explicit origins (no `AllowAnyOrigin` fallback), rate limiting on auth/write/share endpoints, TTL index for auto-expiring clips, ProblemDetails (RFC 7807) error responses
 - **Health checks** — `/health` and `/ready` endpoints
-- **Graceful shutdown** — SIGTERM/SIGINT handling
+- **MongoDB resilience** — retry-with-backoff startup connection, async index creation with conflict tolerance, connection pooling and server-selection timeout tuning
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Runtime | Node.js (>= 22.5.0) |
-| Framework | Express 5 |
-| Database | MongoDB (official Node.js driver) with indexed collections and atomic id counters |
-| Authentication | bcryptjs + jsonwebtoken (JWT) |
-| Security | helmet, compression, morgan, express-rate-limit, sanitize-html |
-| Testing | Jest + supertest |
-| Frontend | Vanilla JS, Quill (rich text), qrcode (QR generation) |
-| Packaging | npm (CommonJS), package-lock.json committed |
+| Backend | ASP.NET Core .NET 10 |
+| Backend framework | Minimal APIs + Controllers, Kestrel |
+| Database | MongoDB (official C# driver 2.29.0) |
+| Authentication | JWT (HMAC SHA-256) + bcrypt password hashing |
+| Security | Rate limiting, CORS, ProblemDetails, ForwardedHeaders |
+| Testing | xUnit + Moq (backend), Karma + Jasmine (frontend) |
+| Frontend | Angular 22, TypeScript, RxJS, Quill (rich text), qrcode (QR generation) |
+| Packaging | npm, .NET SDK |
 
 ## Project Structure
 
 ```
 online-clipboard/
-├── .env.example            # Copy to .env and set your own secrets (never commit .env)
-├ .gitignore                # Excludes secrets, DB, node_modules, build artifacts
-├── LICENSE                 # MIT License
-├── README.md               # This file
-├── package.json            # Scripts, dependencies, engines
-├── package-lock.json       # Locked dependency tree
-├── jest.config.js          # Jest configuration
-├── src/
-│   ├── server.js           # HTTP/HTTPS entry point, graceful shutdown
-│   ├── app.js              # Express app factory, middleware, routes
-│   ├── config/database.js  # MongoDB connection, indexes, id counters
-│   ├── controllers/        # (reserved)
-│   ├── middleware/         # auth, rate limiting
-│   ├── models/             # Clip, User data models
-│   ├── routes/             # auth, clips, share API routes
-│   ├── services/           # maintenance (expired clip purge)
-│   ├── utils/              # ids, password hashing, validation
-│   └── views/              # (reserved)
-├── public/                 # Static frontend (index.html, css, js, icons, vendor, sw.js)
-├── scripts/                # gen-icons.js, sync-vendor.js, migrate-sqlite-to-mongo.js
-├── tests/                  # Jest test suites (auth, clips, share, e2e)
-└── data/                   # Legacy SQLite database (used only by the one-time migration script)
+├── .env.example              # Copy to .env and set your own secrets (never commit .env)
+├── backend/.env              # Backend-specific env (copy from .env.example)
+├── .gitignore                # Excludes secrets, DB, node_modules, build artifacts
+├── LICENSE                   # MIT License
+├── README.md                 # This file
+├── render.yaml               # Render deployment definition
+├── backend/
+│   ├── OnlineClipboard.csproj
+│   ├── Program.cs            # Entry point: DI, auth, CORS, rate limiting, middleware
+│   ├── Controllers/          # AuthController, ClipsController, ShareController
+│   ├── Services/             # JwtService, MongoDbService, PasswordService, ShareService, SanitizationService, MaintenanceService
+│   ├── Middleware/           # AuthMiddleware (token version enforcement)
+│   ├── Models/               # Clip, User, Counter, AuditLog, DTOs
+│   └── Tests/
+│       └── OnlineClipboard.Tests/   # xUnit test suite
+├── frontend/
+│   ├── angular.json
+│   ├── package.json
+│   ├── karma.conf.js
+│   ├── src/
+│   │   ├── app/              # Angular components, services, interceptors, guards
+│   │   └── environments/     # environment.ts, environment.prod.ts
+│   └── scripts/
+│       └── set-api-url.js    # Build-time API URL substitution
+├── tests/                    # Legacy Jest tests (Node.js version)
+├── data/                     # Legacy SQLite database (migration source)
+└── public/                   # Legacy static assets
 ```
 
-## Setup
+## Backend Setup
+
+### Prerequisites
+
+- .NET SDK 10.0+
+- MongoDB (Atlas or self-hosted)
+
+### Install
+
+```bash
+cd backend
+dotnet restore
+```
+
+### Environment configuration
+
+Copy the example file and fill in your own values:
+
+```bash
+cp .env.example .env
+# Edit .env and set JWT_SECRET (required), MONGODB_URI (required), FRONTEND_URL, PUBLIC_BASE_URL
+```
+
+Never commit `.env`. It contains `JWT_SECRET`, `MONGODB_URI`, and other secrets.
+
+### Backend environment variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `JWT_SECRET` | Yes | — | Secret used to sign JWTs — **must be set in production**; app fails fast if missing or set to `dev-secret-change-me` |
+| `MONGODB_URI` | Yes | — | MongoDB connection string |
+| `FRONTEND_URL` | No | — | CORS origin for the frontend (production must set this) |
+| `PUBLIC_BASE_URL` | No | derived from request | Base URL for share links and QR codes |
+| `ASPNETCORE_ENVIRONMENT` | No | `Production` | `Development`, `Production`, or `Testing` |
+| `ASPNETCORE_URLS` | No | `http://+:8080` | Kestrel bind URL |
+| `JWT_EXPIRY_DAYS` | No | `7` | JWT access token expiry in days |
+| `MONGODB_TIMEOUT_MS` | No | `15000` | MongoDB server-selection timeout (ms) |
+| `MONGODB_POOL_SIZE` | No | `100` | Maximum MongoDB connection pool size |
+| `MIGRATE_LEGACY` | No | — | Set to `1` to run the legacy SQLite→MongoDB migration on startup |
+
+Generate a strong `JWT_SECRET`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# or
+openssl rand -hex 32
+```
+
+### Run locally
+
+```bash
+cd backend
+dotnet run
+```
+
+The API listens on `http://localhost:5000` (or `ASPNETCORE_URLS`). Health: `http://localhost:5000/health`. Readiness: `http://localhost:5000/ready`.
+
+### Run tests
+
+```bash
+cd backend
+dotnet test
+```
+
+Integration tests (`MongoDbIntegrationTests`) require `MONGODB_URI` and are skipped otherwise.
+
+## Frontend Setup
 
 ### Prerequisites
 
@@ -69,121 +142,72 @@ online-clipboard/
 ### Install
 
 ```bash
-# Clone the repository
-git clone <REPO_URL>
-cd online-clipboard
-
-# Install dependencies
+cd frontend
 npm install
 ```
 
-The `postinstall` script (`scripts/sync-vendor.js`) copies frontend vendor assets into `public/vendor`.
+### Frontend environment
 
-### Environment configuration
+The production API URL is set at build time via the `API_URL` environment variable (see `render.yaml` or `scripts/set-api-url.js`). In development, `environment.ts` uses `/api` (relative, requires a proxy to the backend).
 
-Copy the example file and fill in your own values:
-
-```bash
-cp .env.example .env
-# Edit .env and set JWT_SECRET (required in production), MONGODB_URI, and PUBLIC_BASE_URL
-```
-
-Never commit `.env`. It contains `JWT_SECRET`, `MONGODB_URI`, and other secrets. `.env` is gitignored.
-
-## Configuration
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `NODE_ENV` | No | `development` | `development`, `test`, or `production` |
-| `PORT` | No | `3000` | HTTP server port |
-| `JWT_SECRET` | Yes (production) | — | Secret used to sign JWTs — **must be set in production** |
-| `PUBLIC_BASE_URL` | No | derived from request | Base URL for share links and QR codes |
-| `RATE_LIMIT_DISABLED` | No | — | Set to `1` to disable rate limiting (dev/test only) |
-| `TLS_PORT` | No | `443` | HTTPS port (when certs present) |
-| `TLS_CERT_PATH` | No | `certs/cert.pem` | TLS certificate path |
-| `TLS_KEY_PATH` | No | `certs/key.pem` | TLS private key path |
-| `MONGODB_URI` | Yes | — | MongoDB connection string (e.g. `mongodb+srv://…`) |
-| `MONGODB_DB` | No | `online_clipboard` | MongoDB database name |
-| `MONGODB_TIMEOUT_MS` | No | `15000` | MongoDB server-selection timeout (ms) |
-| `MONGODB_POOL_SIZE` | No | `10` | Maximum MongoDB connection pool size |
-
-Generate a strong `JWT_SECRET`:
+### Run locally
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### Start the server
-
-Development:
-
-```bash
-npm run dev
-```
-
-Production:
-
-```bash
+cd frontend
 npm start
 ```
 
-The app listens on `http://localhost:3000` by default. If TLS certificate/key files are present in `certs/`, HTTPS is enabled and HTTP redirects to HTTPS.
+The dev server runs on `http://localhost:4200`.
 
-## Testing
+### Run tests
 
 ```bash
-# Run the full test suite
+cd frontend
 npm test
 ```
 
-Tests connect to an isolated MongoDB database (`online_clipboard_test`, overridable with `MONGODB_DB_TEST`) and disable rate limiting. They do **not** touch the production database. Set `MONGODB_URI` before running them.
-
-Current results: **75 tests passing across 4 suites** (auth, clips, share, e2e).
-
-## Deployment
-
-1. Set `NODE_ENV=production`, a strong `JWT_SECRET`, and `MONGODB_URI` (plus `MONGODB_DB` if not using the default).
-2. Set `PUBLIC_BASE_URL` to your public HTTPS origin (used for share links/QR codes).
-3. Allow connections from your host/renderer in the MongoDB cluster's IP access list.
-4. Provide TLS certificate/key in `certs/` (or terminate TLS at a reverse proxy).
-5. Run `npm install --omit=dev` and start with `npm start`.
-6. Place behind a reverse proxy (nginx, Caddy, Traefik, etc.) if desired; the app sets `trust proxy`.
-
-Example systemd unit (`online-clipboard.service`):
-
-```ini
-[Unit]
-Description=Online Clipboard
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/online-clipboard
-Environment=NODE_ENV=production
-EnvironmentFile=/opt/online-clipboard/.env
-ExecStart=/usr/bin/node src/server.js
-Restart=on-failure
-User=online-clipboard
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Migrating existing SQLite data
-
-The legacy SQLite database at `data/clipboard.db` can be copied into MongoDB idempotently:
+### Production build
 
 ```bash
-MONGODB_URI="..." MONGODB_DB=online_clipboard npm run migrate:mongo
+cd frontend
+npm run build
 ```
 
-The script preserves numeric ids, password hashes, share tokens, tags, timestamps, and counters, so existing sessions and share links keep working. Re-running it is safe (documents are upserted by id).
+Output goes to `dist/online-clipboard-frontend/browser`.
 
-## Security
+## Deployment on Render
 
-- `.env` (containing `JWT_SECRET` and `MONGODB_URI`), `data/` (legacy SQLite database), `certs/` (TLS keys), and `node_modules/` are excluded from version control via `.gitignore`.
-- Rotate `JWT_SECRET` if it is ever committed or exposed.
-- Review `src/middleware/rateLimit.js` and adjust limits for your deployment.
+The repository includes `render.yaml` for Render deployment.
+
+### Backend (native web service)
+
+Render's free tier does not support Docker web services, so the backend is configured as a native .NET web service:
+
+- `buildCommand`: `dotnet publish -c Production -o /app/publish`
+- `startCommand`: `dotnet /app/publish/OnlineClipboard.dll`
+- Required env vars (set in Render dashboard or `render.yaml`): `ASPNETCORE_ENVIRONMENT=Production`, `ASPNETCORE_URLS=http://+:8080`, `FRONTEND_URL`, `PUBLIC_BASE_URL`, `MONGODB_URI`, `JWT_SECRET`
+
+### Frontend (static site)
+
+- `buildCommand`: `node scripts/set-api-url.js && npm ci && ng build --configuration production`
+- `staticPublishPath`: `dist/online-clipboard-frontend/browser`
+- Required env var: `API_URL=https://online-clipboard-backend.onrender.com`
+
+The `set-api-url.js` script substitutes the `API_URL` env var into `environment.prod.ts` at build time, so the frontend calls the correct backend origin.
+
+### MongoDB
+
+No database service is declared in `render.yaml`; MongoDB is expected to be external (e.g., MongoDB Atlas). Set `MONGODB_URI` in the Render backend service environment. Ensure your Atlas cluster's IP access list allows connections from Render.
+
+## Security notes
+
+- `JWT_SECRET` must be set to a strong random value in production. The application refuses to start if it is missing or set to the insecure default.
+- CORS is restricted to the configured `FRONTEND_URL` origins. `AllowAnyOrigin()` is only used in development.
+- All clip/resource endpoints enforce ownership (`UserId` filter).
+- JWTs embed a `ver` (token version) claim. Logout and password changes increment `TokenVersion`, invalidating all previously issued tokens.
+- Access tokens are short-lived (configurable via `JWT_EXPIRY_DAYS`, default 7 days).
+- Expired clips are automatically removed by a MongoDB TTL index on `expires_at`.
+- Error responses use ProblemDetails (RFC 7807) format; no stack traces leak to clients.
 
 ## License
 

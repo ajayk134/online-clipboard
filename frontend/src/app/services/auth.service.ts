@@ -40,7 +40,7 @@ export class AuthService {
     }
   }
 
-  private setSession(token: string, user: User): void {
+  setSession(token: string, user: User): void {
     this.token.set(token);
     this.user.set(user);
     this.isLoggedIn.set(true);
@@ -95,12 +95,14 @@ export class AuthService {
   }
 
   logout(): Promise<void> {
+    // Clear the client session first so the UI reflects logout immediately,
+    // regardless of whether the server-side revocation call succeeds.
+    this.clearSession();
     return this.api
       .post<{ message: string }>('/auth/logout')
       .then(() => {})
       .catch(() => {})
       .finally(() => {
-        this.clearSession();
         this.router.navigateByUrl('/login');
       });
   }

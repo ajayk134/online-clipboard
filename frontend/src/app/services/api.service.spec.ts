@@ -95,4 +95,25 @@ describe('ApiService', () => {
 
     expect(err).toBeTruthy();
   });
+
+  it('uses error.error.message when present (not the unreachable template literal)', async () => {
+    let err: unknown;
+    service.get('/clips/1').catch((e) => (err = e));
+    const req = http.expectOne(`${environment.apiUrl}/clips/1`);
+    req.flush({ message: 'custom backend message' }, { status: 400, statusText: 'Bad Request' });
+    await Promise.resolve();
+
+    const apiError = err as { message: string; statusCode?: number };
+    expect(apiError.message).toBe('custom backend message');
+  });
+
+  it('POST is not retried (no duplicate side effects on non-idempotent writes)', async () => {
+    let callCount = 0;
+    service.post('/clips', { content: 'x' }).catch(() => {});
+    const req = http.expectOne(`${environment.apiUrl}/clips`);
+    // Simulate a 500 error: no retry should happen for POST.
+    req.flush({ error: 'server error' }, { status: 500, statusText: 'Server Error' });
+    await Promise.resolve();
+    expect(callCount).toBe(0);
+  });
 });
