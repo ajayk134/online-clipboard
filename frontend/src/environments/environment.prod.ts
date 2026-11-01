@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://installation-bool-date-airline.trycloudflare.com',
+  apiUrl: 'http://157.151.159.137:5000',
   frontendUrl: 'https://online-clipboard-frontend.onrender.com',
 };
