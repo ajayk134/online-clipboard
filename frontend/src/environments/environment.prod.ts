@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: '/api',
-  frontendUrl: 'https://online-clipboard.example.com',
+  apiUrl: 'https://strong-shrimps-laugh.loca.lt',
+  frontendUrl: 'https://online-clipboard-frontend.onrender.com',
 };
