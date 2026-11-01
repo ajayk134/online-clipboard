@@ -38,7 +38,7 @@ public class ShareController : ControllerBase
         return Ok(new
         {
             title = clip.Title,
-            contentType = clip.ContentType,
+            contentType = clip.ContentType.ToString().ToLowerInvariant(),
             language = clip.Language,
             hasPassword = !string.IsNullOrEmpty(clip.PasswordHash),
             isOneTime = clip.IsOneTime,
@@ -90,7 +90,7 @@ public class ShareController : ControllerBase
             {
                 title = updated!.Title,
                 content = updated.Content,
-                contentType = updated.ContentType,
+                contentType = updated.ContentType.ToString().ToLowerInvariant(),
                 language = updated.Language,
                 consumed = true,
                 expiresAt = updated.ExpiresAt,
@@ -110,7 +110,7 @@ public class ShareController : ControllerBase
         {
             title = fetched!.Title,
             content = fetched.Content,
-            contentType = fetched.ContentType,
+            contentType = fetched.ContentType.ToString().ToLowerInvariant(),
             language = fetched.Language,
             consumed = false,
             expiresAt = fetched.ExpiresAt,

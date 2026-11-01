@@ -50,6 +50,7 @@ public class AuthController : ControllerBase
 
         var user = new User
         {
+            Id = _db.NextId("users"),
             Username = req.Username.Trim(),
             UsernameLower = usernameLower,
             Email = req.Email.Trim(),

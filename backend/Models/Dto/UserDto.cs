@@ -17,7 +17,7 @@ public class ClipDto
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public string Excerpt { get; set; } = string.Empty;
-    public ContentType ContentType { get; set; } = ContentType.Text;
+    public string ContentType { get; set; } = "text";
     public string? Language { get; set; }
     public List<string> Tags { get; set; } = new();
     public bool IsPinned { get; set; }

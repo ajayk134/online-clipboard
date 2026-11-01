@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using OnlineClipboard.Middleware;
 using OnlineClipboard.Services;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -111,9 +112,29 @@ if (env.IsDevelopment())
 app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<AuthMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Initialize MongoDB connection and indexes on startup.
+using (var scope = app.Services.CreateScope())
+{
+    var mongo = scope.ServiceProvider.GetRequiredService<IMongoDbService>();
+    try
+    {
+        mongo.Connect();
+        mongo.EnsureIndexes();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("MongoDB connected and indexes ensured");
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "MongoDB startup initialization failed");
+        throw;
+    }
+}
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
 app.MapGet("/ready", (IMongoDbService mongo) =>

@@ -54,8 +54,8 @@ public class ClipsController : ControllerBase
             Title = c.Title,
             Content = c.Content,
             Excerpt = c.Excerpt,
-            ContentType = c.ContentType,
-            Language = c.Language ?? string.Empty,
+            ContentType = c.ContentType.ToString().ToLowerInvariant(),
+            Language = c.Language,
             Tags = c.Tags,
             IsPinned = c.IsPinned,
             IsFavorite = c.IsFavorite,
@@ -220,13 +220,14 @@ public class ClipsController : ControllerBase
                 var content = _sanitizer.Sanitize(item.Content);
                 var clip = new Clip
                 {
+                    Id = _db.NextId("clips"),
                     UserId = userId.Value,
                     Title = string.IsNullOrWhiteSpace(item.Title) ? "Untitled" : item.Title.Trim(),
                     TitleLower = (string.IsNullOrWhiteSpace(item.Title) ? "untitled" : item.Title.Trim()).ToLowerInvariant(),
                     Content = content,
                     Excerpt = content.Length > 200 ? content.Substring(0, 200) : content,
                     ContentType = ParseContentType(item.ContentType),
-                    Language = item.Language ?? string.Empty,
+                    Language = item.Language,
                     Tags = item.Tags ?? new List<string>(),
                     IsPinned = item.IsPinned,
                     IsFavorite = item.IsFavorite,
@@ -277,13 +278,14 @@ public class ClipsController : ControllerBase
 
         var clip = new Clip
         {
+            Id = _db.NextId("clips"),
             UserId = userId.Value,
             Title = title,
             TitleLower = title.ToLowerInvariant(),
             Content = content,
             Excerpt = content.Length > 200 ? content.Substring(0, 200) : content,
             ContentType = ParseContentType(req.ContentType),
-            Language = req.Language ?? string.Empty,
+            Language = req.Language,
             Tags = req.Tags ?? new List<string>(),
             IsPinned = req.IsPinned,
             IsFavorite = req.IsFavorite,

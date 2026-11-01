@@ -82,7 +82,7 @@ public class MongoDbService : IMongoDbService, IDisposable
         var users = db.GetCollection<User>("users");
         users.Indexes.CreateMany(new[]
         {
-            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(u => u.Id), new CreateIndexOptions { Unique = true, Name = "ux_users_id" }),
+            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(u => u.Id), new CreateIndexOptions { Name = "ux_users_id" }),
             new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(u => u.UsernameLower), new CreateIndexOptions { Unique = true, Name = "ux_users_username_lower" }),
             new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(u => u.EmailLower), new CreateIndexOptions { Unique = true, Name = "ux_users_email_lower" }),
         });
@@ -91,10 +91,10 @@ public class MongoDbService : IMongoDbService, IDisposable
         var clips = db.GetCollection<Clip>("clips");
         clips.Indexes.CreateMany(new[]
         {
-            new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.Id), new CreateIndexOptions { Unique = true, Name = "ux_clips_id" }),
+            new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.Id), new CreateIndexOptions { Name = "ux_clips_id" }),
             new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.UserId).Ascending(c => c.CreatedAt), new CreateIndexOptions { Name = "ix_clips_user_created" }),
             new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.UserId).Ascending(c => c.IsPinned).Descending(c => c.UpdatedAt), new CreateIndexOptions { Name = "ix_clips_user_pinned_updated" }),
-            new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.ShareToken), new CreateIndexOptions { Unique = true, Sparse = true, Name = "ux_clips_share_token" }),
+            new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.ShareToken), new CreateIndexOptions { Sparse = true, Name = "ix_clips_share_token" }),
             new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.ExpiresAt), new CreateIndexOptions { Name = "ix_clips_expires_at" }),
             new CreateIndexModel<Clip>(Builders<Clip>.IndexKeys.Ascending(c => c.UserId).Ascending(c => c.Tags), new CreateIndexOptions { Name = "ix_clips_user_tags" }),
         });
@@ -103,7 +103,7 @@ public class MongoDbService : IMongoDbService, IDisposable
         var audit = db.GetCollection<AuditLog>("audit_log");
         audit.Indexes.CreateMany(new[]
         {
-            new CreateIndexModel<AuditLog>(Builders<AuditLog>.IndexKeys.Ascending(a => a.Id), new CreateIndexOptions { Unique = true, Sparse = true, Name = "ux_audit_id" }),
+            new CreateIndexModel<AuditLog>(Builders<AuditLog>.IndexKeys.Ascending(a => a.Id), new CreateIndexOptions { Name = "ux_audit_id" }),
             new CreateIndexModel<AuditLog>(Builders<AuditLog>.IndexKeys.Ascending(a => a.UserId).Ascending(a => a.CreatedAt), new CreateIndexOptions { Name = "ix_audit_user_created" }),
         });
 
