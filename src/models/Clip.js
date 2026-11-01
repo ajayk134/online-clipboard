@@ -62,10 +62,6 @@ class Clip {
     return id;
   }
 
-  static async findById(id) {
-    return getDb().collection('clips').findOne({ id: Number(id) });
-  }
-
   static async findByIdForUser(id, userId) {
     return getDb().collection('clips').findOne({ id: Number(id), user_id: Number(userId) });
   }
@@ -105,10 +101,6 @@ class Clip {
     let cursor = getDb().collection('clips').find(filter).sort(order).skip(off).limit(lim);
     if (sort === 'title') cursor = cursor.collation({ locale: 'en', strength: 2 });
     return cursor.toArray();
-  }
-
-  static async count(userId) {
-    return getDb().collection('clips').countDocuments({ user_id: Number(userId) });
   }
 
   static async update(id, userId, data) {

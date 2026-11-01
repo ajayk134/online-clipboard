@@ -74,6 +74,7 @@ desktop.ini
 .tmp/
 temp/
 
-# Generated screenshot artifacts (regenerate via capture-before.mjs / capture-after.mjs)
+# Generated screenshot artifacts
 /before/
 /after/
+/screenshots/

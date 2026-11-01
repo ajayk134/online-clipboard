@@ -80,13 +80,6 @@ class User {
     return unwrapFindOneAndUpdate(result);
   }
 
-  static async touch(id) {
-    await getDb().collection('users').updateOne(
-      { id: Number(id) },
-      { $set: { updated_at: nowISO() } }
-    );
-  }
-
   // Application-level cascade (MongoDB has no foreign keys).
   static async remove(id) {
     const userId = Number(id);
