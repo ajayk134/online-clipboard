@@ -1,7 +1,7 @@
 // tests/share.test.js — share links, passwords, one-time burn, expiry, public meta
 const { api, registerAndLogin, resetTables } = require('./setup');
 
-beforeEach(() => resetTables());
+beforeEach(async () => { await resetTables(); });
 
 let token;
 beforeEach(async () => {

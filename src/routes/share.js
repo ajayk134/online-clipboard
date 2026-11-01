@@ -14,8 +14,8 @@ function isBurned(row) {
 }
 
 // Public metadata (no content leaks)
-router.get('/:token/meta', shareAccessLimiter, (req, res) => {
-  const row = Clip.findByShareToken(String(req.params.token));
+router.get('/:token/meta', shareAccessLimiter, async (req, res) => {
+  const row = await Clip.findByShareToken(String(req.params.token));
   if (!row || !row.share_enabled) {
     return res.status(404).json({ error: 'This share link does not exist' });
   }
@@ -25,8 +25,8 @@ router.get('/:token/meta', shareAccessLimiter, (req, res) => {
 });
 
 // Access the content (verifies password, burns one-time links atomically)
-router.post('/:token/access', shareAccessLimiter, (req, res) => {
-  const row = Clip.findByShareToken(String(req.params.token));
+router.post('/:token/access', shareAccessLimiter, async (req, res) => {
+  const row = await Clip.findByShareToken(String(req.params.token));
   if (!row || !row.share_enabled) {
     return res.status(404).json({ error: 'This share link does not exist' });
   }
@@ -44,12 +44,12 @@ router.post('/:token/access', shareAccessLimiter, (req, res) => {
   }
 
   // For one-time links, mark consumed atomically before revealing content
-  if (row.is_one_time && !Clip.consumeOneTime(row.id)) {
+  if (row.is_one_time && !(await Clip.consumeOneTime(row.id))) {
     return res.status(410).json({ error: 'This one-time link has already been used', burned: true });
   }
 
-  Clip.registerView(row.id);
-  Clip.log(null, 'share_access', `clip ${row.id}`, req.ip);
+  await Clip.registerView(row.id);
+  await Clip.log(null, 'share_access', `clip ${row.id}`, req.ip);
 
   res.json({
     title: row.title,

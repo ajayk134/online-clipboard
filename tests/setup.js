@@ -1,14 +1,16 @@
-// tests/setup.js — shared test environment: isolated DB, sane env, api helper
+// tests/setup.js — shared test environment: isolated MongoDB database, sane env, api helper
+const path = require('path');
+
+require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
+
 process.env.NODE_ENV = 'test';
-process.env.DB_PATH = process.env.DB_PATH || '/tmp/opencode/test-clipboard.db';
+// Never let tests touch the production database, even if .env sets MONGODB_DB.
+process.env.MONGODB_DB = process.env.MONGODB_DB_TEST || 'online_clipboard_test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-only-secret-do-not-use-in-prod';
 process.env.RATE_LIMIT_DISABLED = '1';
 
-const fs = require('fs');
-if (fs.existsSync(process.env.DB_PATH)) fs.unlinkSync(process.env.DB_PATH);
-
 const request = require('supertest');
-const { db } = require('../src/config/database');
+const { connect, close, getDb } = require('../src/config/database');
 const { createApp } = require('../src/app');
 
 const app = createApp();
@@ -24,7 +26,13 @@ async function api(path, { method = 'GET', token, body } = {}) {
   if (body !== undefined) req = req.send(body);
   const res = await req;
   let data = null;
-  if (res.text) { try { data = JSON.parse(res.text); } catch { data = { raw: res.text }; } }
+  if (res.text) {
+    try {
+      data = JSON.parse(res.text);
+    } catch {
+      data = { raw: res.text };
+    }
+  }
   return { status: res.status, body: data, headers: res.headers };
 }
 
@@ -40,8 +48,28 @@ async function registerAndLogin(overrides = {}) {
   return { user: res.body.user, token: res.body.token, payload };
 }
 
-function resetTables() {
-  db.exec('DELETE FROM audit_log; DELETE FROM clipboard_items; DELETE FROM users;');
+async function resetTables() {
+  const db = getDb();
+  await Promise.all([
+    db.collection('users').deleteMany({}),
+    db.collection('clips').deleteMany({}),
+    db.collection('audit_log').deleteMany({}),
+    db.collection('counters').deleteMany({}),
+  ]);
 }
 
-module.exports = { app, api, registerAndLogin, uniqueUser, resetTables, db };
+beforeAll(async () => {
+  await connect();
+  await resetTables();
+});
+
+afterAll(async () => {
+  try {
+    await getDb().dropDatabase();
+  } catch {
+    /* ignore cleanup failures */
+  }
+  await close();
+});
+
+module.exports = { app, api, registerAndLogin, uniqueUser, resetTables, getDb };

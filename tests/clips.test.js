@@ -1,7 +1,7 @@
 // tests/clips.test.js — clip CRUD, excerpt generation, tags, flags, stats
 const { api, registerAndLogin, resetTables } = require('./setup');
 
-beforeEach(() => resetTables());
+beforeEach(async () => { await resetTables(); });
 
 let token;
 beforeEach(async () => {

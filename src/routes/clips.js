@@ -15,6 +15,7 @@ const {
   stripHtml,
 } = require('../utils/validate');
 const { hashPassword } = require('../utils/password');
+const { nowISO } = require('../config/database');
 const QRCode = require('qrcode');
 
 router.use(authenticate);
@@ -29,7 +30,6 @@ function sharePath(token) {
   return `/s/${token}`;
 }
 
-
 function clipId(req, res) {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -40,10 +40,19 @@ function clipId(req, res) {
 }
 
 // List / search clips
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { q: qParam, search, tag, favorite, pinned, type, sort, limit, offset } = req.query;
   const q = qParam || search;
-  const items = Clip.list(Number(req.user.id), { q, tag, favorite, pinned, type, sort, limit, offset });
+  const items = await Clip.list(Number(req.user.id), {
+    q,
+    tag,
+    favorite,
+    pinned,
+    type,
+    sort,
+    limit,
+    offset,
+  });
   res.json({
     items: items.map((row) => sanitizeClipOutput(row)),
     total: items.length,
@@ -51,17 +60,17 @@ router.get('/', (req, res) => {
 });
 
 // Tag list + stats for sidebar
-router.get('/tags', (req, res) => {
-  res.json({ tags: Clip.tagsWithCounts(Number(req.user.id)) });
+router.get('/tags', async (req, res) => {
+  res.json({ tags: await Clip.tagsWithCounts(Number(req.user.id)) });
 });
 
-router.get('/stats', (req, res) => {
-  res.json(Clip.stats(Number(req.user.id)));
+router.get('/stats', async (req, res) => {
+  res.json(await Clip.stats(Number(req.user.id)));
 });
 
 // Export all (JSON download)
-router.get('/export', (req, res) => {
-  const items = Clip.exportAll(Number(req.user.id));
+router.get('/export', async (req, res) => {
+  const items = await Clip.exportAll(Number(req.user.id));
   const payload = {
     app: 'online-clipboard',
     version: 1,
@@ -74,7 +83,7 @@ router.get('/export', (req, res) => {
 });
 
 // Import (JSON)
-router.post('/import', writeLimiter, (req, res) => {
+router.post('/import', writeLimiter, async (req, res) => {
   const body = req.body || {};
   const items = Array.isArray(body) ? body : body.items;
   if (!Array.isArray(items)) {
@@ -85,18 +94,19 @@ router.post('/import', writeLimiter, (req, res) => {
   }
   let imported = 0;
   const errors = [];
-  items.forEach((raw, index) => {
+  const now = nowISO();
+  for (const [index, raw] of items.entries()) {
     if (!raw || typeof raw !== 'object') {
       errors.push({ index, error: 'Not an object' });
-      return;
+      continue;
     }
     const contentType = ['text', 'richtext', 'code'].includes(raw.contentType || raw.content_type)
-      ? (raw.contentType || raw.content_type)
+      ? raw.contentType || raw.content_type
       : 'text';
     const content = typeof raw.content === 'string' ? raw.content.slice(0, 900000) : '';
     if (!content.trim()) {
       errors.push({ index, error: 'Missing content' });
-      return;
+      continue;
     }
     const tags = normalizeTags(raw.tags) || [];
     let language = null;
@@ -106,52 +116,51 @@ router.post('/import', writeLimiter, (req, res) => {
     if (parsedExpiry) expiresAt = parsedExpiry;
 
     const finalContent = contentType === 'richtext' ? sanitizeRichText(content) : content;
-    const { run, nowISO } = require('../config/database');
-    run(
-      `INSERT INTO clipboard_items
-        (user_id, title, content, excerpt, content_type, language, tags, is_pinned, is_favorite, expires_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    await Clip.create(
       Number(req.user.id),
-      typeof raw.title === 'string' ? raw.title.trim().slice(0, 200) || null : null,
-      finalContent,
-      makeExcerpt(finalContent, contentType),
-      contentType,
-      language,
-      JSON.stringify(tags),
-      raw.isPinned ? 1 : 0,
-      raw.isFavorite ? 1 : 0,
-      expiresAt,
-      nowISO(),
-      nowISO()
+      {
+        title: typeof raw.title === 'string' ? raw.title.trim().slice(0, 200) || null : null,
+        content: finalContent,
+        content_type: contentType,
+        language,
+        tags,
+        is_pinned: raw.isPinned ? 1 : 0,
+        is_favorite: raw.isFavorite ? 1 : 0,
+        expires_at: expiresAt,
+      },
+      { createdAt: now, updatedAt: now }
     );
     imported++;
-  });
-  Clip.log(Number(req.user.id), 'import', `${imported} items`, req.ip);
+  }
+  await Clip.log(Number(req.user.id), 'import', `${imported} items`, req.ip);
   res.status(201).json({ imported, errors });
 });
 
 // Create clip
-router.post('/', writeLimiter, (req, res) => {
+router.post('/', writeLimiter, async (req, res) => {
   const { errors, data } = validateClipPayload(req.body || {});
   if (errors.length) return res.status(400).json({ error: errors[0], errors });
 
   const share = !!req.body.share;
-  const passwordHash = req.body.sharePassword ? hashPassword(String(req.body.sharePassword)) : null;
-  const id = Clip.create(Number(req.user.id), data, {
+  const passwordHash = req.body.sharePassword
+    ? hashPassword(String(req.body.sharePassword))
+    : null;
+  const id = await Clip.create(Number(req.user.id), data, {
     passwordHash,
     share,
   });
-  const row = Clip.findByIdForUser(id, Number(req.user.id));
-  Clip.log(Number(req.user.id), 'create', `clip ${id}`, req.ip);
+  const row = await Clip.findByIdForUser(id, Number(req.user.id));
+  await Clip.log(Number(req.user.id), 'create', `clip ${id}`, req.ip);
   const out = sanitizeClipOutput(row);
   if (out.shareEnabled) out.shareUrl = sharePath(row.share_token);
   res.status(201).json(out);
 });
 
 // Read single clip
-router.get('/:id', (req, res) => {
-  const id = clipId(req, res); if (!id) return;
-  const row = Clip.findByIdForUser(id, Number(req.user.id));
+router.get('/:id', async (req, res) => {
+  const id = clipId(req, res);
+  if (!id) return;
+  const row = await Clip.findByIdForUser(id, Number(req.user.id));
   if (!row) return res.status(404).json({ error: 'Clip not found' });
   const out = sanitizeClipOutput(row);
   if (out.shareEnabled) out.shareUrl = sharePath(row.share_token);
@@ -159,59 +168,66 @@ router.get('/:id', (req, res) => {
 });
 
 // Update clip
-router.patch('/:id', writeLimiter, (req, res) => {
-  const id = clipId(req, res); if (!id) return;
-  const existing = Clip.findByIdForUser(id, Number(req.user.id));
+router.patch('/:id', writeLimiter, async (req, res) => {
+  const id = clipId(req, res);
+  if (!id) return;
+  const existing = await Clip.findByIdForUser(id, Number(req.user.id));
   if (!existing) return res.status(404).json({ error: 'Clip not found' });
 
   const { errors, data } = validateClipPayload(req.body || {}, { partial: true });
   if (errors.length) return res.status(400).json({ error: errors[0], errors });
   if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-  Clip.update(Number(req.params.id), Number(req.user.id), data);
-  const row = Clip.findByIdForUser(Number(req.params.id), Number(req.user.id));
+  await Clip.update(id, Number(req.user.id), data);
+  const row = await Clip.findByIdForUser(id, Number(req.user.id));
   const out = sanitizeClipOutput(row);
   if (out.shareEnabled) out.shareUrl = sharePath(row.share_token);
   res.json(out);
 });
 
 // Record a copy event (history stats)
-router.patch('/:id/copy', (req, res) => {
-  const id = clipId(req, res); if (!id) return;
-  const changes = Clip.markCopied(id, Number(req.user.id));
+router.patch('/:id/copy', async (req, res) => {
+  const id = clipId(req, res);
+  if (!id) return;
+  const changes = await Clip.markCopied(id, Number(req.user.id));
   if (!changes) return res.status(404).json({ error: 'Clip not found' });
   res.json({ ok: true });
 });
 
 // Favorite / pin quick toggles
-router.patch('/:id/flags', (req, res) => {
+router.patch('/:id/flags', async (req, res) => {
   const body = req.body || {};
   const data = {};
   if (typeof body.isFavorite === 'boolean') data.is_favorite = body.isFavorite ? 1 : 0;
   if (typeof body.isPinned === 'boolean') data.is_pinned = body.isPinned ? 1 : 0;
   if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No flags provided' });
-  const id = clipId(req, res); if (!id) return;
-  const changes = Clip.update(id, Number(req.user.id), data);
+  const id = clipId(req, res);
+  if (!id) return;
+  const changes = await Clip.update(id, Number(req.user.id), data);
   if (!changes) return res.status(404).json({ error: 'Clip not found' });
-  const row = Clip.findByIdForUser(Number(req.params.id), Number(req.user.id));
+  const row = await Clip.findByIdForUser(id, Number(req.user.id));
   res.json(sanitizeClipOutput(row));
 });
 
 // Delete clip
-router.delete('/:id', (req, res) => {
-  const id = clipId(req, res); if (!id) return;
-  const changes = Clip.remove(id, Number(req.user.id));
+router.delete('/:id', async (req, res) => {
+  const id = clipId(req, res);
+  if (!id) return;
+  const changes = await Clip.remove(id, Number(req.user.id));
   if (!changes) return res.status(404).json({ error: 'Clip not found' });
-  Clip.log(Number(req.user.id), 'delete', `clip ${id}`, req.ip);
+  await Clip.log(Number(req.user.id), 'delete', `clip ${id}`, req.ip);
   res.json({ ok: true });
 });
 
 // Share settings
-router.post('/:id/share', writeLimiter, (req, res) => {
+router.post('/:id/share', writeLimiter, async (req, res) => {
+  const id = clipId(req, res);
+  if (!id) return;
+  const userId = Number(req.user.id);
   const body = req.body || {};
+
   if (body.enabled === false) {
-    const id = clipId(req, res); if (!id) return;
-    const changes = Clip.disableShare(id, Number(req.user.id));
+    const changes = await Clip.disableShare(id, userId);
     if (!changes) return res.status(404).json({ error: 'Clip not found' });
     return res.json({ shareEnabled: false });
   }
@@ -221,7 +237,7 @@ router.post('/:id/share', writeLimiter, (req, res) => {
     regenerate: !!body.regenerate || !!body.rotate || body.revoke === true,
   };
   if (typeof body.password === 'string' && body.password.length > 0) {
-    if (body.password.length < 1 || body.password.length > 128) {
+    if (body.password.length > 128) {
       return res.status(400).json({ error: 'Share password must be 4-128 characters' });
     }
     opts.passwordHash = hashPassword(body.password);
@@ -229,16 +245,15 @@ router.post('/:id/share', writeLimiter, (req, res) => {
     opts.passwordHash = null;
   } else {
     // keep existing password when not specified
-    const existing = Clip.findByIdForUser(clipId(req, res) ?? -1, Number(req.user.id));
+    const existing = await Clip.findByIdForUser(id, userId);
     if (!existing) return res.status(404).json({ error: 'Clip not found' });
     opts.passwordHash = existing.password_hash;
   }
 
-  const shareId = clipId(req, res); if (!shareId) return;
-  const token = Clip.enableShare(shareId, Number(req.user.id), opts);
+  const token = await Clip.enableShare(id, userId, opts);
   if (!token) return res.status(404).json({ error: 'Clip not found' });
-  const row = Clip.findByIdForUser(Number(req.params.id), Number(req.user.id));
-  Clip.log(Number(req.user.id), 'share', `clip ${shareId}`, req.ip);
+  const row = await Clip.findByIdForUser(id, userId);
+  await Clip.log(userId, 'share', `clip ${id}`, req.ip);
   const out = sanitizeClipOutput(row);
   out.shareUrl = sharePath(token);
   res.json(out);
@@ -246,8 +261,9 @@ router.post('/:id/share', writeLimiter, (req, res) => {
 
 // QR code (PNG) for the share link
 router.get('/:id/qr', async (req, res) => {
-  const id = clipId(req, res); if (!id) return;
-  const row = Clip.findByIdForUser(id, Number(req.user.id));
+  const id = clipId(req, res);
+  if (!id) return;
+  const row = await Clip.findByIdForUser(id, Number(req.user.id));
   if (!row) return res.status(404).json({ error: 'Clip not found' });
   if (!row.share_enabled || !row.share_token) {
     return res.status(400).json({ error: 'Sharing is not enabled for this clip' });
@@ -271,9 +287,10 @@ router.get('/:id/qr', async (req, res) => {
 });
 
 // Single clip export as txt/html/md
-router.get('/:id/export', (req, res) => {
-  const id = clipId(req, res); if (!id) return;
-  const row = Clip.findByIdForUser(id, Number(req.user.id));
+router.get('/:id/export', async (req, res) => {
+  const id = clipId(req, res);
+  if (!id) return;
+  const row = await Clip.findByIdForUser(id, Number(req.user.id));
   if (!row) return res.status(404).json({ error: 'Clip not found' });
   const safeName = (row.title || 'clip').replace(/[^a-zA-Z0-9-_ ]/g, '').slice(0, 50) || 'clip';
   const format = (req.query.format || 'txt').toLowerCase();

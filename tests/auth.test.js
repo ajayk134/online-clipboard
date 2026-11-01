@@ -1,7 +1,7 @@
 // tests/auth.test.js — registration, login, session, password change
 const { api, registerAndLogin, resetTables, uniqueUser } = require('./setup');
 
-beforeEach(() => resetTables());
+beforeEach(async () => { await resetTables(); });
 
 describe('POST /api/auth/register', () => {
   it('registers a user and returns a valid session', async () => {

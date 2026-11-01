@@ -24,7 +24,7 @@ function verifyToken(token) {
   return jwt.verify(token, getSecret(), { issuer: 'online-clipboard' });
 }
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) {
@@ -36,7 +36,7 @@ function authenticate(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Invalid or expired session' });
   }
-  const user = User.findById(payload.sub);
+  const user = await User.findById(payload.sub);
   if (!user || Number(user.token_version || 0) !== Number(payload.ver)) {
     return res.status(401).json({ error: 'Session is no longer valid' });
   }

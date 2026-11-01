@@ -160,6 +160,16 @@ function validateClipPayload(body, { partial = false } = {}) {
   return { errors, data };
 }
 
+function normalizeOutputTags(tags) {
+  if (Array.isArray(tags)) return tags;
+  try {
+    const parsed = JSON.parse(tags || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function sanitizeClipOutput(row, { includeContent = true } = {}) {
   if (!row) return null;
   const out = {
@@ -167,7 +177,7 @@ function sanitizeClipOutput(row, { includeContent = true } = {}) {
     title: row.title,
     contentType: row.content_type,
     language: row.language || null,
-    tags: JSON.parse(row.tags || '[]'),
+    tags: normalizeOutputTags(row.tags),
     isPinned: !!row.is_pinned,
     isFavorite: !!row.is_favorite,
     copyCount: Number(row.copy_count || 0),

@@ -9,7 +9,7 @@ const authRoutes = require('./routes/auth');
 const clipRoutes = require('./routes/clips');
 const shareRoutes = require('./routes/share');
 const { globalLimiter } = require('./middleware/rateLimit');
-const { db } = require('./config/database');
+const { ping } = require('./config/database');
 
 function createApp() {
   const app = express();
@@ -75,12 +75,12 @@ function createApp() {
     res.json({ status: 'ok', uptime: process.uptime(), time: new Date().toISOString() });
   });
 
-  app.get('/ready', (req, res) => {
+  app.get('/ready', async (req, res) => {
     try {
-      db.prepare('SELECT 1').get();
+      await ping();
       res.json({ status: 'ready' });
-    } catch (err) {
-      res.status(503).json({ status: 'degraded', error: err.message });
+    } catch {
+      res.status(503).json({ status: 'degraded', error: 'database unavailable' });
     }
   });
 

@@ -1,7 +1,7 @@
 // tests/e2e.test.js — end-to-end + edge-case coverage for auth, clips, sharing, DB
-const { api, registerAndLogin, resetTables, db, app } = require('./setup');
+const { api, registerAndLogin, resetTables, getDb, app } = require('./setup');
 
-beforeEach(() => resetTables());
+beforeEach(async () => { await resetTables(); });
 
 describe('E2E: authentication', () => {
   it('register -> login -> me -> password change invalidates old token', async () => {
@@ -319,16 +319,18 @@ describe('E2E: database operations', () => {
     expect((await api('/api/auth/me', { token: t2 })).status).toBe(200);
   });
 
-  it('user deletion cascades clips (ON DELETE CASCADE)', async () => {
+  it('user deletion cascades clips (application-level)', async () => {
     const { token, user } = await registerAndLogin();
     await api('/api/clips', { method: 'POST', token, body: { content: 'c1', contentType: 'text' } });
     expect((await api('/api/clips', { token })).body.items).toHaveLength(1);
-    const deleted = db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
-    expect(deleted.changes).toBe(1);
+    const User = require('../src/models/User');
+    const deleted = await User.remove(user.id);
+    expect(deleted.deleted).toBe(1);
+    expect(deleted.clips).toBe(1);
     // token no longer valid since user is gone
     expect((await api('/api/clips', { token })).status).toBe(401);
-    const remaining = db.prepare('SELECT COUNT(*) AS c FROM clipboard_items').get().c;
-    expect(Number(remaining)).toBe(0);
+    const remaining = await getDb().collection('clips').countDocuments();
+    expect(remaining).toBe(0);
   });
 
   it('maintenance purgeExpired removes expired only', async () => {
@@ -339,19 +341,19 @@ describe('E2E: database operations', () => {
     await api('/api/clips', { method: 'POST', token, body: { content: 'keep', contentType: 'text', expiresAt: future } });
     await api('/api/clips', { method: 'POST', token, body: { content: 'never', contentType: 'text' } });
     const Clip = require('../src/models/Clip');
-    const purged = Clip.purgeExpired();
+    const purged = await Clip.purgeExpired();
     expect(purged).toBe(1);
     const list = await api('/api/clips', { token });
     expect(list.body.items.map((i) => i.content)).toEqual(expect.arrayContaining(['keep', 'never']));
   });
 
-  it('schema version is applied and migrations idempotent', async () => {
-    const version = db.prepare('PRAGMA user_version').get().user_version;
-    expect(version).toBe(2);
-    // re-run migrate via new app instance would be idempotent; column set is stable
-    const cols = db.prepare('PRAGMA table_info(clipboard_items)').all().map((r) => r.name);
-    expect(cols).toContain('share_token');
-    expect(cols).toContain('excerpt');
-    expect(cols).toContain('password_hash');
+  it('MongoDB indexes are created and idempotent', async () => {
+    const clipIndexes = (await getDb().collection('clips').indexes()).map((i) => i.name);
+    expect(clipIndexes).toContain('share_token_1');
+    expect(clipIndexes).toContain('user_created');
+    expect(clipIndexes).toContain('expires_at_1');
+    const userIndexes = (await getDb().collection('users').indexes()).map((i) => i.name);
+    expect(userIndexes).toContain('username_lower_1');
+    expect(userIndexes).toContain('email_lower_1');
   });
 });

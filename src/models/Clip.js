@@ -1,158 +1,216 @@
 // src/models/Clip.js
-const { get, all, run, nowISO } = require('../config/database');
+const { getDb, nextId, nowISO, unwrapFindOneAndUpdate } = require('../config/database');
 const { shareToken } = require('../utils/ids');
 const { makeExcerpt, sanitizeRichText } = require('../utils/validate');
 
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 class Clip {
-  static create(userId, data, { passwordHash = null, share = false } = {}) {
+  static async create(
+    userId,
+    data,
+    {
+      passwordHash = null,
+      share = false,
+      createdAt = null,
+      updatedAt = null,
+      isPinned = null,
+      isFavorite = null,
+      isOneTime = false,
+      shareToken: tokenOverride = null,
+      shareEnabled = null,
+      copyCount = 0,
+      viewCount = 0,
+      readCount = 0,
+    } = {}
+  ) {
+    const contentType = data.content_type || 'text';
     const content =
-      data.content_type === 'richtext' ? sanitizeRichText(data.content) : data.content;
-    const excerpt = makeExcerpt(content, data.content_type);
-    const token = share ? shareToken() : null;
+      contentType === 'richtext' ? sanitizeRichText(data.content) : data.content;
+    const now = nowISO();
+    const created = createdAt || now;
+    const token = tokenOverride || (share ? shareToken() : null);
+    const title = data.title ?? null;
+    const id = await nextId('clips');
 
-    const result = run(
-      `INSERT INTO clipboard_items
-        (user_id, title, content, excerpt, content_type, language, tags,
-         is_pinned, is_favorite, expires_at, share_token, share_enabled, is_one_time, password_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      userId,
-      data.title ?? null,
+    await getDb().collection('clips').insertOne({
+      id,
+      user_id: Number(userId),
+      title,
+      title_lower: title ? String(title).toLowerCase() : null,
       content,
-      excerpt,
-      data.content_type || 'text',
-      data.language ?? null,
-      JSON.stringify(data.tags || []),
-      data.is_pinned ? 1 : 0,
-      data.is_favorite ? 1 : 0,
-      data.expires_at ?? null,
-      token,
-      share && token ? 1 : 0,
-      0,
-      passwordHash
-    );
-    return Number(result.lastInsertRowid);
+      excerpt: makeExcerpt(content, contentType),
+      content_type: contentType,
+      language: data.language ?? null,
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      is_pinned: isPinned !== null ? !!isPinned : !!data.is_pinned,
+      is_favorite: isFavorite !== null ? !!isFavorite : !!data.is_favorite,
+      copy_count: Number(copyCount) || 0,
+      view_count: Number(viewCount) || 0,
+      share_token: token,
+      share_enabled: shareEnabled !== null ? !!shareEnabled : !!(share && token),
+      expires_at: data.expires_at ?? null,
+      is_one_time: !!isOneTime,
+      read_count: Number(readCount) || 0,
+      password_hash: passwordHash,
+      created_at: created,
+      updated_at: updatedAt || created,
+    });
+
+    return id;
   }
 
-  static findById(id) {
-    return get('SELECT * FROM clipboard_items WHERE id = ?', id);
+  static async findById(id) {
+    return getDb().collection('clips').findOne({ id: Number(id) });
   }
 
-  static findByIdForUser(id, userId) {
-    return get('SELECT * FROM clipboard_items WHERE id = ? AND user_id = ?', id, userId);
+  static async findByIdForUser(id, userId) {
+    return getDb().collection('clips').findOne({ id: Number(id), user_id: Number(userId) });
   }
 
-  static list(userId, { q, tag, favorite, pinned, type, sort = 'created', limit = 100, offset = 0 } = {}) {
-    const where = ['user_id = ?'];
-    const params = [userId];
+  static async list(
+    userId,
+    { q, tag, favorite, pinned, type, sort = 'created', limit = 100, offset = 0 } = {}
+  ) {
+    const filter = { user_id: Number(userId) };
 
     if (q) {
-      where.push(`(title LIKE ? ESCAPE '\\' OR excerpt LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')`);
-      const like = `%${String(q).replace(/[\\%_]/g, (c) => '\\' + c)}%`;
-      params.push(like, like, like, like);
+      const regex = new RegExp(escapeRegex(q), 'i');
+      filter.$or = [
+        { title: regex },
+        { excerpt: regex },
+        { content: regex },
+        { tags: regex },
+      ];
     }
-    if (tag) {
-      where.push("EXISTS (SELECT 1 FROM json_each(clipboard_items.tags) jt WHERE jt.value = ?)");
-      params.push(String(tag).toLowerCase());
-    }
-    if (favorite === '1' || favorite === 1 || favorite === true) where.push('is_favorite = 1');
-    if (pinned === '1' || pinned === 1 || pinned === true) where.push('is_pinned = 1');
+    if (tag) filter.tags = String(tag).toLowerCase();
+    if (favorite === '1' || favorite === 1 || favorite === true) filter.is_favorite = true;
+    if (pinned === '1' || pinned === 1 || pinned === true) filter.is_pinned = true;
     if (type && ['text', 'richtext', 'code'].includes(type)) {
-      where.push('content_type = ?');
-      params.push(type);
+      filter.content_type = type;
     }
 
     const orderMap = {
-      created: 'is_pinned DESC, created_at DESC',
-      updated: 'is_pinned DESC, updated_at DESC',
-      title: 'is_pinned DESC, title COLLATE NOCASE ASC',
-      copies: 'is_pinned DESC, copy_count DESC, created_at DESC',
+      created: { is_pinned: -1, created_at: -1 },
+      updated: { is_pinned: -1, updated_at: -1 },
+      title: { is_pinned: -1, title: 1 },
+      copies: { is_pinned: -1, copy_count: -1, created_at: -1 },
     };
     const order = orderMap[sort] || orderMap.created;
     const lim = Math.max(1, Math.min(200, Number(limit) || 100));
     const off = Math.max(0, Number(offset) || 0);
 
-    const sql = `SELECT * FROM clipboard_items WHERE ${where.join(' AND ')}
-      ORDER BY ${order} LIMIT ${lim} OFFSET ${off}`;
-    return all(sql, ...params);
+    let cursor = getDb().collection('clips').find(filter).sort(order).skip(off).limit(lim);
+    if (sort === 'title') cursor = cursor.collation({ locale: 'en', strength: 2 });
+    return cursor.toArray();
   }
 
-  static count(userId) {
-    return Number(get('SELECT COUNT(*) AS c FROM clipboard_items WHERE user_id = ?', userId).c);
+  static async count(userId) {
+    return getDb().collection('clips').countDocuments({ user_id: Number(userId) });
   }
 
-  static update(id, userId, data) {
-    const fields = [];
-    const params = [];
+  static async update(id, userId, data) {
+    const clipId = Number(id);
+    const uid = Number(userId);
+    const set = {};
 
     if (data.content !== undefined || data.content_type !== undefined) {
-      const existing = this.findById(id);
-      const newContent =
-        data.content !== undefined ? data.content : existing.content;
-      const newType = data.content_type !== undefined ? data.content_type : existing.content_type;
+      const existing = await this.findByIdForUser(clipId, uid);
+      if (!existing) return 0;
+      const newContent = data.content !== undefined ? data.content : existing.content;
+      const newType =
+        data.content_type !== undefined ? data.content_type : existing.content_type;
       const content = newType === 'richtext' ? sanitizeRichText(newContent) : newContent;
-      fields.push('content = ?', 'excerpt = ?', 'content_type = ?');
-      params.push(content, makeExcerpt(content, newType), newType);
+      set.content = content;
+      set.excerpt = makeExcerpt(content, newType);
+      set.content_type = newType;
       if (data.language === undefined && existing.language && newType !== 'code') {
-        fields.push('language = ?');
-        params.push(null);
+        set.language = null;
       }
     }
-    if (data.title !== undefined) { fields.push('title = ?'); params.push(data.title); }
-    if (data.language !== undefined) { fields.push('language = ?'); params.push(data.language); }
-    if (data.tags !== undefined) { fields.push('tags = ?'); params.push(JSON.stringify(data.tags)); }
-    if (data.is_pinned !== undefined) { fields.push('is_pinned = ?'); params.push(data.is_pinned); }
-    if (data.is_favorite !== undefined) { fields.push('is_favorite = ?'); params.push(data.is_favorite); }
-    if (data.expires_at !== undefined) { fields.push('expires_at = ?'); params.push(data.expires_at); }
+    if (data.title !== undefined) {
+      set.title = data.title;
+      set.title_lower = data.title ? String(data.title).toLowerCase() : null;
+    }
+    if (data.language !== undefined) set.language = data.language;
+    if (data.tags !== undefined) set.tags = Array.isArray(data.tags) ? data.tags : [];
+    if (data.is_pinned !== undefined) set.is_pinned = !!data.is_pinned;
+    if (data.is_favorite !== undefined) set.is_favorite = !!data.is_favorite;
+    if (data.expires_at !== undefined) set.expires_at = data.expires_at;
 
-    if (fields.length === 0) return 0;
+    if (Object.keys(set).length === 0) return 0;
 
-    fields.push('updated_at = ?');
-    params.push(nowISO());
-    params.push(id, userId);
-
-    const result = run(
-      `UPDATE clipboard_items SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
-      ...params
-    );
-    return Number(result.changes);
+    set.updated_at = nowISO();
+    const result = await getDb()
+      .collection('clips')
+      .updateOne({ id: clipId, user_id: uid }, { $set: set });
+    return result.matchedCount;
   }
 
-  static remove(id, userId) {
-    return Number(run('DELETE FROM clipboard_items WHERE id = ? AND user_id = ?', id, userId).changes);
+  static async remove(id, userId) {
+    const result = await getDb()
+      .collection('clips')
+      .deleteOne({ id: Number(id), user_id: Number(userId) });
+    return result.deletedCount;
   }
 
-  static markCopied(id, userId) {
-    const result = run(
-      'UPDATE clipboard_items SET copy_count = copy_count + 1 WHERE id = ? AND user_id = ?',
-      id, userId
-    );
-    return Number(result.changes);
+  static async markCopied(id, userId) {
+    const result = await getDb()
+      .collection('clips')
+      .updateOne(
+        { id: Number(id), user_id: Number(userId) },
+        { $inc: { copy_count: 1 } }
+      );
+    return result.matchedCount;
   }
 
   // ---- sharing ----
 
-  static enableShare(id, userId, { passwordHash = null, isOneTime = false, regenerate = false } = {}) {
-    const item = this.findByIdForUser(id, userId);
+  static async enableShare(
+    id,
+    userId,
+    { passwordHash = null, isOneTime = false, regenerate = false } = {}
+  ) {
+    const item = await this.findByIdForUser(id, userId);
     if (!item) return null;
     const token = regenerate || !item.share_token ? shareToken() : item.share_token;
-    run(
-      `UPDATE clipboard_items
-       SET share_token = ?, share_enabled = 1, is_one_time = ?, password_hash = ?, updated_at = ?
-       WHERE id = ? AND user_id = ?`,
-      token, isOneTime ? 1 : 0, passwordHash, nowISO(), id, userId
-    );
+    await getDb()
+      .collection('clips')
+      .updateOne(
+        { id: Number(id), user_id: Number(userId) },
+        {
+          $set: {
+            share_token: token,
+            share_enabled: true,
+            is_one_time: !!isOneTime,
+            password_hash: passwordHash,
+            updated_at: nowISO(),
+          },
+        }
+      );
     return token;
   }
 
-  static disableShare(id, userId) {
-    return Number(run(
-      'UPDATE clipboard_items SET share_enabled = 0, password_hash = NULL, updated_at = ? WHERE id = ? AND user_id = ?',
-      nowISO(), id, userId
-    ).changes);
+  static async disableShare(id, userId) {
+    const result = await getDb()
+      .collection('clips')
+      .updateOne(
+        { id: Number(id), user_id: Number(userId) },
+        {
+          $set: {
+            share_enabled: false,
+            password_hash: null,
+            updated_at: nowISO(),
+          },
+        }
+      );
+    return result.matchedCount;
   }
 
-  static findByShareToken(token) {
-    return get('SELECT * FROM clipboard_items WHERE share_token = ?', token);
+  static async findByShareToken(token) {
+    return getDb().collection('clips').findOne({ share_token: token });
   }
 
   static shareMeta(row) {
@@ -171,41 +229,57 @@ class Clip {
   }
 
   // Atomically burn a one-time link; returns true if this call consumed it.
-  static consumeOneTime(id) {
-    return Number(run(
-      'UPDATE clipboard_items SET read_count = read_count + 1 WHERE id = ? AND is_one_time = 1 AND read_count = 0',
-      id
-    ).changes) === 1;
+  static async consumeOneTime(id) {
+    const result = await getDb()
+      .collection('clips')
+      .findOneAndUpdate(
+        { id: Number(id), is_one_time: true, read_count: 0 },
+        { $inc: { read_count: 1 } },
+        { returnDocument: 'after' }
+      );
+    return !!unwrapFindOneAndUpdate(result);
   }
 
-  static registerView(id) {
-    run('UPDATE clipboard_items SET view_count = view_count + 1 WHERE id = ?', id);
+  static async registerView(id) {
+    await getDb()
+      .collection('clips')
+      .updateOne({ id: Number(id) }, { $inc: { view_count: 1 } });
   }
 
   // ---- tags/stats/import/export/purge ----
 
-  static tagsWithCounts(userId) {
-    return all(
-      `SELECT jt.value AS tag, COUNT(*) AS count
-       FROM clipboard_items, json_each(clipboard_items.tags) jt
-       WHERE clipboard_items.user_id = ?
-       GROUP BY jt.value ORDER BY count DESC, tag ASC`,
-      userId
-    );
+  static async tagsWithCounts(userId) {
+    return getDb()
+      .collection('clips')
+      .aggregate([
+        { $match: { user_id: Number(userId) } },
+        { $unwind: '$tags' },
+        { $group: { _id: '$tags', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } },
+        { $project: { _id: 0, tag: '$_id', count: 1 } },
+      ])
+      .toArray();
   }
 
-  static stats(userId) {
-    const row = get(
-      `SELECT
-        COUNT(*) AS total,
-        SUM(is_favorite) AS favorites,
-        SUM(is_pinned) AS pinned,
-        SUM(copy_count) AS copies,
-        SUM(view_count) AS views,
-        SUM(share_enabled) AS shared
-       FROM clipboard_items WHERE user_id = ?`,
-      userId
-    );
+  static async stats(userId) {
+    const rows = await getDb()
+      .collection('clips')
+      .aggregate([
+        { $match: { user_id: Number(userId) } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            favorites: { $sum: { $cond: ['$is_favorite', 1, 0] } },
+            pinned: { $sum: { $cond: ['$is_pinned', 1, 0] } },
+            copies: { $sum: '$copy_count' },
+            views: { $sum: '$view_count' },
+            shared: { $sum: { $cond: ['$share_enabled', 1, 0] } },
+          },
+        },
+      ])
+      .toArray();
+    const row = rows[0] || {};
     return {
       total: Number(row.total || 0),
       favorites: Number(row.favorites || 0),
@@ -216,33 +290,59 @@ class Clip {
     };
   }
 
-  static exportAll(userId) {
-    return all(
-      `SELECT title, content, content_type AS contentType, language, tags,
-              is_pinned AS isPinned, is_favorite AS isFavorite, created_at AS createdAt
-       FROM clipboard_items WHERE user_id = ? ORDER BY created_at ASC`,
-      userId
-    ).map((row) => ({ ...row, tags: JSON.parse(row.tags || '[]'), isPinned: !!row.isPinned, isFavorite: !!row.isFavorite }));
+  static async exportAll(userId) {
+    const rows = await getDb()
+      .collection('clips')
+      .find({ user_id: Number(userId) })
+      .sort({ created_at: 1 })
+      .project({
+        _id: 0,
+        title: 1,
+        content: 1,
+        content_type: 1,
+        language: 1,
+        tags: 1,
+        is_pinned: 1,
+        is_favorite: 1,
+        created_at: 1,
+      })
+      .toArray();
+    return rows.map((row) => ({
+      title: row.title,
+      content: row.content,
+      contentType: row.content_type,
+      language: row.language,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      isPinned: !!row.is_pinned,
+      isFavorite: !!row.is_favorite,
+      createdAt: row.created_at,
+    }));
   }
 
-  static purgeExpiredOlderThan(days = 7) {
-    return Number(run(
-      `DELETE FROM clipboard_items
-       WHERE expires_at IS NOT NULL AND expires_at < datetime('now', ?)`,
-      `-${Number(days)} days`
-    ).changes);
+  static async purgeExpiredOlderThan(days = 7) {
+    const cutoff = new Date(Date.now() - Number(days) * 864e5).toISOString();
+    const result = await getDb()
+      .collection('clips')
+      .deleteMany({ expires_at: { $ne: null, $lt: cutoff } });
+    return result.deletedCount;
   }
 
-  static purgeExpired() {
-    return Number(run(
-      "DELETE FROM clipboard_items WHERE expires_at IS NOT NULL AND expires_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')"
-    ).changes);
+  static async purgeExpired() {
+    const result = await getDb()
+      .collection('clips')
+      .deleteMany({ expires_at: { $ne: null, $lt: nowISO() } });
+    return result.deletedCount;
   }
 
-  static log(userId, action, detail, ip) {
+  static async log(userId, action, detail, ip) {
     try {
-      run('INSERT INTO audit_log (user_id, action, detail, ip) VALUES (?, ?, ?, ?)',
-        userId, action, detail || null, ip || null);
+      await getDb().collection('audit_log').insertOne({
+        user_id: userId == null ? null : Number(userId),
+        action,
+        detail: detail || null,
+        ip: ip || null,
+        created_at: nowISO(),
+      });
     } catch {
       /* audit failures must never break requests */
     }

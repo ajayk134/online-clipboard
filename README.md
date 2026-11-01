@@ -2,7 +2,7 @@
 
 Production-ready online clipboard: rich text, code snippets, history, search, tags, favorites, secure sharing, PWA.
 
-A self-contained, self-hosted clipboard service built with Node.js, Express, and SQLite. Users can create and organize text, rich-text, and code clips, pin and favorite items, search across content, export/import clips, and share clips securely with optional password protection, one-time links, expiration, and QR codes.
+A self-contained, self-hosted clipboard service built with Node.js, Express, and MongoDB. Users can create and organize text, rich-text, and code clips, pin and favorite items, search across content, export/import clips, and share clips securely with optional password protection, one-time links, expiration, and QR codes.
 
 ## Features
 
@@ -24,7 +24,7 @@ A self-contained, self-hosted clipboard service built with Node.js, Express, and
 |-------|------------|
 | Runtime | Node.js (>= 22.5.0) |
 | Framework | Express 5 |
-| Database | SQLite (`node:sqlite` `DatabaseSync`) with WAL mode + migrations |
+| Database | MongoDB (official Node.js driver) with indexed collections and atomic id counters |
 | Authentication | bcryptjs + jsonwebtoken (JWT) |
 | Security | helmet, compression, morgan, express-rate-limit, sanitize-html |
 | Testing | Jest + supertest |
@@ -45,7 +45,7 @@ online-clipboard/
 ├── src/
 │   ├── server.js           # HTTP/HTTPS entry point, graceful shutdown
 │   ├── app.js              # Express app factory, middleware, routes
-│   ├── config/database.js  # SQLite connection, schema migrations
+│   ├── config/database.js  # MongoDB connection, indexes, id counters
 │   ├── controllers/        # (reserved)
 │   ├── middleware/         # auth, rate limiting
 │   ├── models/             # Clip, User data models
@@ -54,9 +54,9 @@ online-clipboard/
 │   ├── utils/              # ids, password hashing, validation
 │   └── views/              # (reserved)
 ├── public/                 # Static frontend (index.html, css, js, icons, vendor, sw.js)
-├── scripts/                # gen-icons.js, sync-vendor.js
+├── scripts/                # gen-icons.js, sync-vendor.js, migrate-sqlite-to-mongo.js
 ├── tests/                  # Jest test suites (auth, clips, share, e2e)
-└── data/                   # SQLite database (gitignored, created at runtime)
+└── data/                   # Legacy SQLite database (used only by the one-time migration script)
 ```
 
 ## Setup
@@ -85,10 +85,10 @@ Copy the example file and fill in your own values:
 
 ```bash
 cp .env.example .env
-# Edit .env and set JWT_SECRET (required in production) and PUBLIC_BASE_URL
+# Edit .env and set JWT_SECRET (required in production), MONGODB_URI, and PUBLIC_BASE_URL
 ```
 
-Never commit `.env`. It contains `JWT_SECRET` and other secrets. `.env` is gitignored.
+Never commit `.env`. It contains `JWT_SECRET`, `MONGODB_URI`, and other secrets. `.env` is gitignored.
 
 ## Configuration
 
@@ -102,7 +102,10 @@ Never commit `.env`. It contains `JWT_SECRET` and other secrets. `.env` is gitig
 | `TLS_PORT` | No | `443` | HTTPS port (when certs present) |
 | `TLS_CERT_PATH` | No | `certs/cert.pem` | TLS certificate path |
 | `TLS_KEY_PATH` | No | `certs/key.pem` | TLS private key path |
-| `DB_PATH` | No | `data/clipboard.db` | SQLite database file path |
+| `MONGODB_URI` | Yes | — | MongoDB connection string (e.g. `mongodb+srv://…`) |
+| `MONGODB_DB` | No | `online_clipboard` | MongoDB database name |
+| `MONGODB_TIMEOUT_MS` | No | `15000` | MongoDB server-selection timeout (ms) |
+| `MONGODB_POOL_SIZE` | No | `10` | Maximum MongoDB connection pool size |
 
 Generate a strong `JWT_SECRET`:
 
@@ -133,16 +136,16 @@ The app listens on `http://localhost:3000` by default. If TLS certificate/key fi
 npm test
 ```
 
-Tests use an isolated SQLite database under `/tmp` and disable rate limiting. They do **not** touch your local `data/` database.
+Tests connect to an isolated MongoDB database (`online_clipboard_test`, overridable with `MONGODB_DB_TEST`) and disable rate limiting. They do **not** touch the production database. Set `MONGODB_URI` before running them.
 
 Current results: **75 tests passing across 4 suites** (auth, clips, share, e2e).
 
 ## Deployment
 
-1. Set `NODE_ENV=production` and a strong `JWT_SECRET`.
+1. Set `NODE_ENV=production`, a strong `JWT_SECRET`, and `MONGODB_URI` (plus `MONGODB_DB` if not using the default).
 2. Set `PUBLIC_BASE_URL` to your public HTTPS origin (used for share links/QR codes).
-3. Provide TLS certificate/key in `certs/` (or terminate TLS at a reverse proxy).
-4. Ensure the `data/` directory is writable by the app process (SQLite database).
+3. Allow connections from your host/renderer in the MongoDB cluster's IP access list.
+4. Provide TLS certificate/key in `certs/` (or terminate TLS at a reverse proxy).
 5. Run `npm install --omit=dev` and start with `npm start`.
 6. Place behind a reverse proxy (nginx, Caddy, Traefik, etc.) if desired; the app sets `trust proxy`.
 
@@ -166,9 +169,19 @@ User=online-clipboard
 WantedBy=multi-user.target
 ```
 
+### Migrating existing SQLite data
+
+The legacy SQLite database at `data/clipboard.db` can be copied into MongoDB idempotently:
+
+```bash
+MONGODB_URI="..." MONGODB_DB=online_clipboard npm run migrate:mongo
+```
+
+The script preserves numeric ids, password hashes, share tokens, tags, timestamps, and counters, so existing sessions and share links keep working. Re-running it is safe (documents are upserted by id).
+
 ## Security
 
-- `.env` (containing `JWT_SECRET`), `data/` (SQLite database), `certs/` (TLS keys), and `node_modules/` are excluded from version control via `.gitignore`.
+- `.env` (containing `JWT_SECRET` and `MONGODB_URI`), `data/` (legacy SQLite database), `certs/` (TLS keys), and `node_modules/` are excluded from version control via `.gitignore`.
 - Rotate `JWT_SECRET` if it is ever committed or exposed.
 - Review `src/middleware/rateLimit.js` and adjust limits for your deployment.
 
