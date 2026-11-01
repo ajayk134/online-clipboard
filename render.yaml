@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: online-clipboard-backend
+    env: docker
+    repo: https://github.com/ajayk134/online-clipboard
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: free
+    branch: main
+    autoDeploy: "yes"
+    healthCheckPath: /ready
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+  - type: static
+    name: online-clipboard-frontend
+    repo: https://github.com/ajayk134/online-clipboard
+    rootDir: frontend
+    region: oregon
+    plan: free
+    branch: main
+    autoDeploy: "yes"
+    buildCommand: npm ci && ng build --configuration production
+    staticPublishPath: dist/online-clipboard-frontend/browser
+    envVars:
+      - key: API_URL
+        value: https://online-clipboard-backend.onrender.com

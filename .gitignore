@@ -46,6 +46,14 @@ out/
 .cache/
 .parcel-cache/
 *.tgz
+bin/
+obj/
+
+# .NET build artifacts
+*.user
+*.userprefs
+*.lock.json
+publish/
 
 # Test / coverage
 coverage/

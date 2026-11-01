@@ -1,0 +1,197 @@
+.share-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 2rem 1rem;
+}
+
+.share-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.share-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.share-link {
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(99,102,241,0.3);
+  word-break: break-all;
+  padding: 0.5rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.share-card {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.share-meta {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.share-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.share-meta-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.meta-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.meta-chip--onetime { color: var(--danger); border-color: var(--danger); background: rgba(239,68,68,0.1); }
+
+.share-excerpt {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.share-access {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.access-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  max-width: 320px;
+}
+
+.access-state svg { color: var(--text-muted); }
+
+.access-state h3 { margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--text); }
+.access-state p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.9375rem;
+  outline: none;
+}
+
+.form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+
+.share-content {
+  padding: 1.5rem;
+}
+
+.content-title {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.code-block {
+  margin: 0 0 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-x: auto;
+  color: var(--text);
+}
+
+.rich-block {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+.rich-block h1, .rich-block h2, .rich-block h3 { color: var(--text); margin-top: 1rem; }
+.rich-block p { margin: 0.5rem 0; }
+.rich-block blockquote { border-left: 3px solid var(--primary); padding-left: 1rem; color: var(--text-muted); margin: 0.5rem 0; }
+
+.text-block { font-size: 0.9375rem; line-height: 1.7; white-space: pre-wrap; color: var(--text); }
+
+.content-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.burn-notice {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--warning);
+  font-weight: 600;
+  text-align: center;
+}
+
+.share-expired {
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.share-expired svg { color: var(--text-muted); margin-bottom: 1rem; }
+
+.share-expired h3 { margin: 0 0 0.5rem; font-size: 1.25rem; font-weight: 700; color: var(--text); }
+.share-expired p { margin: 0; color: var(--text-muted); }
+
+.share-loading { padding: 2rem; text-align: center; color: var(--text-muted); }
+
+@media (max-width: 480px) {
+  .share-page { padding: 1rem 0.5rem; }
+  .share-header { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .share-link { order: 2; }
+}

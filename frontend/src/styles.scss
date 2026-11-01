@@ -1,0 +1,166 @@
+/* Online Clipboard — Design System
+   ========================================================================== */
+
+/* CSS custom properties (tokens) */
+:root {
+  /* Color palette (light) */
+  --color-brand: 99 102 241;        /* indigo-500 */
+  --color-brand-hover: 79 70 229;   /* indigo-600 */
+  --color-brand-glow: 99 102 241 / 0.15;
+
+  --color-success: 34 197 94;       /* green-500 */
+  --color-warning: 234 179 8;       /* yellow-500 */
+  --color-danger: 239 68 68;        /* red-500 */
+  --color-info: 59 130 246;         /* blue-500 */
+
+  /* Semantic (light) */
+  --bg: 250 250 250;                /* gray-50 */
+  --surface: 255 255 255;           /* white */
+  --card: 255 255 255;
+  --sidebar: 255 255 255;
+  --input-bg: 255 255 255;
+  --text: 15 23 42;                 /* slate-900 */
+  --text-muted: 71 85 105;          /* slate-500 */
+  --text-inverse: 255 255 255;
+
+  --border: 226 232 240;            /* gray-200 */
+  --border-hover: 203 213 225;      /* gray-300 */
+  --accent-bg: 241 245 249;         /* slate-100 */
+  --accent-border: 203 213 225;
+  --accent-hover: 241 245 249;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Radius */
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Derived semantic variables */
+  --primary: rgb(var(--color-brand));
+  --primary-hover: rgb(var(--color-brand-hover));
+  --success: rgb(var(--color-success));
+  --warning: rgb(var(--color-warning));
+  --danger: rgb(var(--color-danger));
+  --info: rgb(var(--color-info));
+}
+
+/* Dark theme */
+html[data-theme='dark'] {
+  --bg: 15 23 42;
+  --surface: 30 41 59;
+  --card: 30 41 59;
+  --sidebar: 30 41 59;
+  --input-bg: 51 65 85;
+  --text: 248 250 252;
+  --text-muted: 148 163 184;
+  --border: 51 65 85;
+  --border-hover: 71 85 105;
+  --accent-bg: 51 65 85 / 0.5;
+  --accent-border: 71 85 105;
+  --accent-hover: 51 65 85;
+}
+
+html {
+  box-sizing: border-box;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgb(var(--text));
+  background: rgb(var(--bg));
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.125rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.btn--primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.btn--primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.btn--primary:active { transform: scale(0.97); }
+
+.btn--outline {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn--outline:hover { background: var(--accent-bg); border-color: var(--border-hover); }
+
+.btn--danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.btn--danger:hover { background: #dc2626; }
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* App root */
+app-root { display: block; }
